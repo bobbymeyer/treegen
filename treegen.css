@@ -1,0 +1,342 @@
+/* treegen — tool chrome.
+ *
+ * Neutral greys, black hairlines and hard offset shadows, matching the site's
+ * existing surfaces. Everything is left-aligned. Colour belongs to the tree,
+ * not to the UI.
+ */
+
+#treegen {
+  --tg-ink: #000;
+  --tg-panel: #ccc;
+  --tg-stage: #fff;
+  --tg-hair: #000;
+  --tg-muted: rgba(0, 0, 0, 0.55);
+  --tg-shadow: 0.35rem 0.35rem 0 0 rgba(0, 0, 0, 1);
+
+  max-width: 1180px;
+  margin: 0 auto calc(var(--spacing-unit) * 2);
+  padding: 0 var(--spacing-unit);
+  text-align: left;
+}
+
+/* ---------- Header ---------- */
+
+#tg-head {
+  margin-bottom: var(--spacing-unit);
+}
+
+#tg-head h1 {
+  font-size: var(--font-size-h2);
+  line-height: 1;
+}
+
+.tg-version {
+  font-size: var(--font-size-h6);
+  font-weight: 200;
+  letter-spacing: 0.02em;
+  margin-left: 0.25rem;
+  vertical-align: super;
+}
+
+.tg-sub {
+  color: var(--tg-muted);
+  margin-top: 0.25rem;
+}
+
+/* ---------- Toolbar ---------- */
+
+.tg-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.8rem;
+  padding: 0.6rem 0.7rem;
+  background: var(--tg-panel);
+  border: 1px solid var(--tg-hair);
+  border-radius: 0.25rem;
+  box-shadow: var(--tg-shadow);
+}
+
+.tg-group {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Dashed rule separating each group, rather than a heavier divider. */
+.tg-group + .tg-group {
+  padding-left: 0.8rem;
+  border-left: 1px dashed rgba(0, 0, 0, 0.45);
+}
+
+.tg-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: lowercase;
+  color: var(--tg-muted);
+}
+
+.tg-btn {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  line-height: 1;
+  padding: 0.4rem 0.5rem;
+  color: var(--tg-ink);
+  background: var(--tg-stage);
+  border: 1px solid var(--tg-hair);
+  border-radius: 0.15rem;
+  cursor: pointer;
+}
+
+.tg-btn:hover {
+  background: var(--tg-ink);
+  color: var(--tg-stage);
+}
+
+.tg-btn:active {
+  transform: translate(1px, 1px);
+}
+
+/* The file input is hidden behind its own label, styled as a button. */
+.tg-file {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tg-file input[type='file'] {
+  display: none;
+}
+
+#treegen select,
+#treegen input[type='text'],
+#treegen input[type='number'],
+#treegen textarea {
+  font-family: inherit;
+  font-size: 0.8rem;
+  padding: 0.35rem 0.4rem;
+  color: var(--tg-ink);
+  background: var(--tg-stage);
+  border: 1px solid var(--tg-hair);
+  border-radius: 0.15rem;
+}
+
+#tg-interval,
+#tg-layers,
+#tg-trunk {
+  width: 2.9rem;
+}
+
+.tg-unit {
+  font-size: 0.75rem;
+  color: var(--tg-muted);
+  margin-left: -0.2rem;
+}
+
+.tg-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  cursor: pointer;
+}
+
+.tg-readout {
+  font-size: 0.75rem;
+  padding: 0.3rem 0.4rem;
+  color: var(--tg-muted);
+  background: var(--tg-stage);
+  border: 1px dashed rgba(0, 0, 0, 0.45);
+  border-radius: 0.15rem;
+  white-space: nowrap;
+}
+
+/* ---------- L-system disclosure ---------- */
+
+#tg-lsys {
+  margin-top: 0.6rem;
+  border: 1px dashed rgba(0, 0, 0, 0.45);
+  border-radius: 0.25rem;
+  background: var(--tg-panel);
+}
+
+#tg-lsys > summary {
+  padding: 0.45rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  list-style: none;
+}
+
+#tg-lsys > summary::before {
+  content: '+ ';
+  font-weight: 800;
+}
+
+#tg-lsys[open] > summary::before {
+  content: '− ';
+}
+
+.tg-lsys-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+.tg-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--tg-muted);
+}
+
+.tg-field-wide {
+  flex: 1 1 18rem;
+}
+
+.tg-field textarea {
+  width: 100%;
+  resize: vertical;
+  font-family: ui-monospace, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
+.tg-field input[type='number'] {
+  width: 5rem;
+}
+
+/* ---------- Stage ---------- */
+
+#tg-canvas {
+  margin-top: 0.75rem;
+  background: var(--tg-stage);
+  border: 1px solid var(--tg-hair);
+  border-radius: 0.25rem;
+  box-shadow: var(--tg-shadow);
+  overflow: hidden;
+}
+
+.tg-stage {
+  display: block;
+  width: 100%;
+  height: auto;
+  touch-action: none;   /* pointer drags shouldn't scroll the page */
+  cursor: crosshair;
+}
+
+.tg-site {
+  fill: rgba(0, 0, 0, 0.16);
+  shape-rendering: crispEdges;
+}
+
+.tg-horizon-line {
+  stroke: rgba(0, 0, 0, 0.55);
+  stroke-width: 1;
+  stroke-dasharray: 5 4;
+}
+
+.tg-branch {
+  stroke: #3a3028;
+  stroke-linecap: round;
+  fill: none;
+}
+
+/* The trunk — the most central path — carries no vegetation, so it reads as
+   bare wood. Slightly darker and blunt-ended to look structural. */
+.tg-branch-trunk {
+  stroke: #2b231c;
+  stroke-linecap: butt;
+}
+
+/* Roots read lighter and dashed, so the structure below the horizon is
+   legible without competing with the canopy. */
+.tg-branch-root {
+  stroke: #6b5c4a;
+  stroke-dasharray: 3 3;
+}
+
+/* Node points are authoring chrome, not part of the drawing: invisible until
+   you put the cursor on one. They keep their hit area either way, so the tree
+   is grabbable everywhere without being peppered with dots. */
+.tg-handle {
+  fill: #fff;
+  stroke: #000;
+  stroke-width: 1;
+  cursor: grab;
+  opacity: 0;
+  transition: opacity 90ms ease-out;
+}
+
+.tg-handle:hover,
+.tg-handle:focus {
+  opacity: 1;
+}
+
+/* The root is the horizon marker, so it stays visible. */
+.tg-handle-root {
+  fill: #000;
+  stroke: #000;
+  opacity: 1;
+}
+
+/* While a drag is in progress, show every point so you can see where the
+   node may land. */
+.tg-stage.is-dragging .tg-handle {
+  opacity: 0.45;
+}
+
+/* Legal drag destinations. `is-hot` is the one that will be committed. */
+.tg-target {
+  fill: rgba(0, 0, 0, 0.08);
+  stroke: rgba(0, 0, 0, 0.5);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  pointer-events: none;
+}
+
+.tg-target.is-hot {
+  fill: rgba(0, 0, 0, 0.35);
+  stroke: #000;
+  stroke-dasharray: none;
+}
+
+/* The only illegal drop is a point another node already holds. */
+.tg-target.is-blocked {
+  fill: none;
+  stroke: #8a1c14;
+  stroke-dasharray: 2 2;
+}
+
+/* ---------- Status ---------- */
+
+.tg-status {
+  min-height: 1.2rem;
+  margin-top: 0.5rem;
+  font-size: 0.78rem;
+  color: var(--tg-muted);
+}
+
+.tg-status.is-error {
+  color: #8a1c14;
+  font-weight: 600;
+}
+
+/* ---------- Narrow screens ---------- */
+
+@media (max-width: 720px) {
+  .tg-group + .tg-group {
+    padding-left: 0;
+    border-left: 0;
+  }
+
+  .tg-bar {
+    gap: 0.5rem 0.75rem;
+  }
+}

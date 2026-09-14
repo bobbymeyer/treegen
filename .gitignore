@@ -1,0 +1,8 @@
+# macOS
+.DS_Store
+
+# Node
+node_modules
+
+# Test output — regenerated on every `npm test`
+test/treegen-proof.html

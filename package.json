@@ -1,0 +1,13 @@
+{
+  "name": "treegen",
+  "version": "0.1.0",
+  "description": "A grid-constrained tree and vegetation generator",
+  "type": "module",
+  "license": "MIT",
+  "scripts": {
+    "test": "node --test test/treegen.test.mjs"
+  },
+  "engines": {
+    "node": ">=22.12.0"
+  }
+}
