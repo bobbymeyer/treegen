@@ -49,6 +49,15 @@ regenerating, so earlier years survive. Branches mature: once a limb passes a
 Strahler threshold it stops bearing foliage and sheds its fine twigs, which come
 away in winter with the leaves. That is what opens the inside of an older crown.
 
+**Old wood still breaks buds.** A tree growing only at its ends would hollow
+out, so mature wood has a set chance each spring of putting out a fresh shoot
+part-way along a limb — between two nodes that have both passed the maturity
+threshold, never at the frontier where it runs out. The bud opens into the
+widest gap in the wood already leaving that node, and takes what room the
+lattice gives it. Nothing marks a shoot afterwards: a forked one is limb enough
+to last, a single strand is a twig on old wood and winter takes it, which is
+roughly what becomes of the real thing.
+
 **Everything stochastic is seeded.** Voronoi sites, the L-system, placement,
 tone, palette substitution, growth, and every leaf's fall each draw from their
 own named stream — so rolling one never disturbs another, and the same seed
@@ -98,7 +107,7 @@ deploy rather than vendored, so there is one copy rather than two that drift.
 | `rng.js` | mulberry32, named sub-streams, per-object streams |
 | `grid.js` | the four lattices, adjacency, Poisson-disc + Delaunay |
 | `tree.js` | the node graph, depth, Strahler order, trunk, pruning |
-| `lsystem.js` | rules, expansion, the lattice turtle, growth |
+| `lsystem.js` | rules, expansion, the lattice turtle, growth, shoots |
 | `foliage.js` | placement rules, crown shape, tone and palette |
 | `render.js` | scene to SVG, canvas interaction |
 | `animate.js` | the season clock and every transition |

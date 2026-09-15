@@ -60,6 +60,9 @@ function defaultDoc() {
         matureOrder: FOLIAGE_DEFAULTS.placement.matureOrder,
       },
       cullMaxTwig: 3,
+      // Chance each spring that a mature node breaks a new shoot. Stored as
+      // a fraction; the toolbar shows it as a percentage.
+      sproutChance: LSYSTEM_DEFAULTS.sproutChance,
     },
     lsystem: {
       axiom: LSYSTEM_DEFAULTS.axiom,
@@ -205,9 +208,16 @@ function boot(root) {
       growChance: doc.rules.growChance ?? LSYSTEM_DEFAULTS.growChance,
       rootGrowChance: doc.rules.rootGrowChance ?? LSYSTEM_DEFAULTS.rootGrowChance,
       growLimit: doc.rules.growLimit ?? LSYSTEM_DEFAULTS.growLimit,
+      // Shoots from old wood. `matureOrder` is the foliage threshold — the
+      // same line that decides a limb bears no leaves and sheds its twigs
+      // decides which wood can break a bud, so the two never drift apart.
+      sproutChance: doc.rules.sproutChance ?? LSYSTEM_DEFAULTS.sproutChance,
+      matureOrder: doc.rules.placement.matureOrder,
       // One seeded roll per tip; extendTips decides which threshold applies,
-      // since only it knows whether a tip is a branch or a root.
+      // since only it knows whether a tip is a branch or a root. Sprouting
+      // draws from its own stream, so changing one never reshuffles the other.
       roll: (id) => objRng(seed, id, 'grow')(),
+      sproutRoll: (id) => objRng(seed, id, 'sprout')(),
     }, {
       edge: (from, to) => connectAt(doc.tree, grid, from, to),
     });
@@ -225,10 +235,13 @@ function boot(root) {
     });
     const added = doc.tree.nodes.length - before;
     const shed = culled ? `, shed ${culled} over winter` : '';
+    const broke = result.sprouts
+      ? `, ${result.sprouts} shoot${result.sprouts > 1 ? 's' : ''} off old wood`
+      : '';
     say(
       result.capped
         ? `year ${year + 1} — fully grown${shed}`
-        : `year ${year + 1} — grew ${added} new${shed}`
+        : `year ${year + 1} — grew ${added} new${broke}${shed}`
     );
   }
 
@@ -293,6 +306,9 @@ function boot(root) {
     if ($('#tg-layers')) $('#tg-layers').value = String(doc.rules.placement.layers);
     if ($('#tg-trunk')) $('#tg-trunk').value = String(doc.rules.placement.trunkMinOrder);
     if ($('#tg-grow')) $('#tg-grow').checked = !!doc.grow;
+    if ($('#tg-sprout')) {
+      $('#tg-sprout').value = String(Math.round((doc.rules.sproutChance ?? 0) * 100));
+    }
     if ($('#tg-seed')) $('#tg-seed').textContent = String(doc.seed);
     if ($('#tg-year')) $('#tg-year').textContent = String(doc.year + 1);
     if ($('#tg-season')) $('#tg-season').textContent = animator.season();
@@ -417,6 +433,23 @@ function boot(root) {
           doc.grow
             ? 'the tree will put on new growth each spring'
             : 'structure is fixed — only the canopy changes with the year'
+        );
+      });
+    }
+
+    const sproutInput = $('#tg-sprout');
+    if (sproutInput) {
+      sproutInput.value = String(Math.round((doc.rules.sproutChance ?? 0) * 100));
+      sproutInput.addEventListener('change', () => {
+        const pct = Math.max(0, Math.min(100, Math.round(Number(sproutInput.value) || 0)));
+        sproutInput.value = String(pct);
+        doc.rules.sproutChance = pct / 100;
+        // Nothing to redraw: this only decides what next spring does.
+        saveDraft();
+        say(
+          pct === 0
+            ? 'growth only at the tips — old wood stays bare'
+            : `${pct}% chance a mature limb breaks a new shoot each spring`
         );
       });
     }
