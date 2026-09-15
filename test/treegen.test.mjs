@@ -626,6 +626,135 @@ test('growth stops at the limit and reports bad rules', () => {
   assert.match(inert.error, /no new growth/);
 });
 
+// ---------- shoots from old wood ----------
+
+// One season on a tree old enough to have mature wood. Every node the rule
+// offers a bud to is recorded on the way past, so a test can check what was
+// picked rather than trying to infer it from the result.
+function season(sproutChance, matureOrder, seed = 9) {
+  const grid = makeGrid({ type: 'square', width: 2400, height: 1800, spacing: 20 });
+  const tree = makeTree();
+  const start = grid.nearest(1200, 1550);
+  addNodeAt(tree, grid, start);
+  generate(grid, start,
+    { rules: 'F -> F[+F][-F]F', iterations: 4, angle: 35, step: 2, seed: 3, jitter: 35 },
+    { edge: (a, b) => connectAt(tree, grid, a, b) });
+
+  const offered = [];
+  const before = metrics(tree);
+  const res = extendTips(grid, tree, before,
+    { rules: 'F -> F[+F][-F]F', angle: 35, step: 2, seed, jitter: 35,
+      growChance: 0.65, rootGrowChance: 0.3, balance: 0.8,
+      sproutChance, matureOrder,
+      roll: (id) => objRng(seed, id, 'grow')(),
+      sproutRoll: (id) => {
+        offered.push(id);
+        return objRng(seed, id, 'sprout')();
+      } },
+    { edge: (a, b) => connectAt(tree, grid, a, b) });
+
+  return { grid, tree, before, after: metrics(tree), res, offered };
+}
+
+test('shoots break from between mature nodes, never anywhere else', () => {
+  const MATURE = 3;
+  const run = season(1, MATURE);
+
+  assert.ok(run.res.ok, run.res.error);
+  assert.ok(run.res.sprouts > 0, 'no shoot broke from mature wood');
+  assert.ok(run.offered.length >= run.res.sprouts);
+
+  const m = run.before;
+  for (const id of run.offered) {
+    assert.notEqual(id, run.tree.rootId, 'a bud was offered to the root itself');
+    assert.ok(!m.terminal.has(id), `${id} is a tip — tips have their own rule`);
+    assert.ok((m.strahler.get(id) || 1) >= MATURE,
+      `a bud was offered to ${id}, which is not mature wood`);
+    // Strahler order never rises outward, so a mature node with a mature
+    // child sits strictly between two of them rather than at the frontier.
+    const kids = m.children.get(id) || [];
+    assert.ok(kids.some((c) => (m.strahler.get(c) || 1) >= MATURE),
+      `${id} is where the mature zone ends, not a point between its nodes`);
+  }
+
+  // A shoot joins the tree it came off: no loop, and nothing left floating.
+  assert.equal(run.tree.edges.length, run.tree.nodes.length - 1, 'a shoot closed a loop');
+  assert.equal(run.after.order.length, run.tree.nodes.length, 'a shoot floated free');
+});
+
+test('shoots are seeded, and stay put without a maturity threshold', () => {
+  const gis = (seed) => season(1, 3, seed).tree.nodes.map((n) => n.gi).join(',');
+  assert.equal(gis(11), gis(11), 'the same year must put out the same shoots');
+  assert.notEqual(gis(11), gis(12), 'a different year should shoot differently');
+
+  assert.equal(season(0, 3).res.sprouts, 0, 'shoots broke with the chance at zero');
+
+  // Without a threshold there is no mature zone to break from, whatever the
+  // chance says — the app passes its foliage setting through rather than this
+  // module keeping a second copy of it.
+  const noZone = season(1, 0);
+  assert.equal(noZone.offered.length, 0);
+  assert.equal(noZone.res.sprouts, 0, 'shoots broke with no mature zone defined');
+});
+
+// Shoots are cheap and tips are exponential, so the pass that runs second on
+// a shared node budget is the one that gets nothing. Old wood goes first.
+test('shoots get their chance before the tips spend the budget', () => {
+  const MATURE = 3;
+  const roomy = season(1, MATURE, 9);
+  assert.ok(roomy.res.sprouts > 0);
+
+  // The same season, with only enough budget left for a fraction of it: the
+  // shoots still break, and it is tip growth that gives way.
+  const grid = makeGrid({ type: 'square', width: 2400, height: 1800, spacing: 20 });
+  const tree = makeTree();
+  const start = grid.nearest(1200, 1550);
+  addNodeAt(tree, grid, start);
+  generate(grid, start,
+    { rules: 'F -> F[+F][-F]F', iterations: 4, angle: 35, step: 2, seed: 3, jitter: 35 },
+    { edge: (a, b) => connectAt(tree, grid, a, b) });
+
+  const tight = extendTips(grid, tree, metrics(tree),
+    { rules: 'F -> F[+F][-F]F', angle: 35, step: 2, seed: 9, jitter: 35,
+      growLimit: tree.nodes.length + 12,
+      growChance: 0.65, rootGrowChance: 0.3, balance: 0.8,
+      sproutChance: 1, matureOrder: MATURE,
+      roll: (id) => objRng(9, id, 'grow')(),
+      sproutRoll: (id) => objRng(9, id, 'sprout')() },
+    { edge: (a, b) => connectAt(tree, grid, a, b) });
+
+  assert.ok(tight.sprouts > 0, 'the tips took a budget the shoots never saw');
+  assert.ok(tight.tips < roomy.res.tips, 'tip growth should be what gives way');
+});
+
+test('a season spends its whole node budget rather than half of it', () => {
+  const grid = makeGrid({ type: 'square', width: 2400, height: 1800, spacing: 20 });
+  const tree = makeTree();
+  const start = grid.nearest(1200, 1550);
+  addNodeAt(tree, grid, start);
+  generate(grid, start,
+    { rules: 'F -> F[+F][-F]F', iterations: 3, angle: 35, step: 2, seed: 1, jitter: 35 },
+    { edge: (a, b) => connectAt(tree, grid, a, b) });
+
+  const LIMIT = 300;
+  let last = null;
+  for (let y = 1; y <= 10; y++) {
+    last = extendTips(grid, tree, metrics(tree),
+      { rules: 'F -> F[+F][-F]F', angle: 35, step: 2, seed: y, jitter: 35,
+        growLimit: LIMIT, growChance: 0.65, rootGrowChance: 0.3, balance: 0.8,
+        roll: (id) => objRng(y, id, 'grow')() },
+      { edge: (a, b) => connectAt(tree, grid, a, b) });
+  }
+
+  // `grown` counts segments, and a segment landing on a point the tree
+  // already holds adds no node — so counting it against the limit alongside
+  // the tree's own length stops a season at roughly half its budget.
+  assert.ok(tree.nodes.length >= LIMIT,
+    `growth stalled at ${tree.nodes.length} of a ${LIMIT} node budget`);
+  assert.ok(tree.nodes.length < LIMIT + 16, 'growth overran its budget');
+  assert.equal(last.capped, true);
+});
+
 test('the turtle can continue from an existing heading', () => {
   const grid = makeGrid({ type: 'square', width: 900, height: 900, spacing: 30 });
   const start = grid.nearest(450, 450);
@@ -928,9 +1057,16 @@ test('a growing tree renews rather than only accreting', () => {
       if (cullOrder) shed += pruneMatureTwigs(tree, { matureOrder: cullOrder, maxTwig: 3 });
     }
     const m = metrics(tree);
-    let maxOrder = 0;
-    for (const v of m.strahler.values()) maxOrder = Math.max(maxOrder, v);
-    return { shed, maxOrder, nodes: tree.nodes.length, whole: m.order.length === tree.nodes.length };
+    // Fine twigs still hanging off thick wood — the clutter inside the crown
+    // that shedding exists to take away.
+    let clutter = 0;
+    for (const node of tree.nodes) {
+      if ((m.strahler.get(node.id) || 1) < 3) continue;
+      for (const c of m.children.get(node.id) || []) {
+        if ((m.strahler.get(c) || 1) === 1 && (m.subtree.get(c) || 1) <= 3) clutter += 1;
+      }
+    }
+    return { shed, clutter, nodes: tree.nodes.length, whole: m.order.length === tree.nodes.length };
   };
 
   const kept = run(0);
@@ -938,8 +1074,14 @@ test('a growing tree renews rather than only accreting', () => {
   assert.equal(kept.shed, 0);
   assert.ok(shedding.shed > 0, 'nothing was shed over eight years');
   assert.ok(shedding.whole, 'pruning fragmented a grown tree');
-  // Shedding keeps the structure simpler than letting it pile up.
-  assert.ok(shedding.maxOrder <= kept.maxOrder, 'shedding should not complicate the tree');
+
+  // What shedding is for, measured where it happens: heavy wood carrying a
+  // fringe of twigs. Not max Strahler order — both trees run to the same node
+  // budget, and the shedding one spends it on limbs instead of that fringe,
+  // so its order reads *higher* while its crown is the open one.
+  assert.ok(kept.clutter > 0, 'the un-shed tree should be cluttered with twigs');
+  assert.ok(shedding.clutter < kept.clutter / 4,
+    'shedding left the inside of the crown as cluttered as not shedding at all');
 });
 
 // ---------- shed limbs fall ----------

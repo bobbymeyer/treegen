@@ -47,6 +47,13 @@ export const LSYSTEM_DEFAULTS = {
   maxNodes: 900,
   growChance: 0.65,     // share of canopy tips that take each spring
   rootGrowChance: 0.3,  // roots put on growth more slowly than branches
+
+  // Old wood does not only extend at its ends. Once a limb has matured it
+  // can still break a fresh shoot from a dormant bud part-way along, between
+  // one mature node and the next. `matureOrder` is the same threshold the
+  // foliage rules use and is passed in by the caller rather than kept here
+  // twice — with none given, nothing sprouts.
+  sproutChance: 0.25,   // chance a mature node breaks a new shoot each spring
   balance: 0.8,         // how strongly growth favours the lighter side, 0..1
   growLimit: 700,       // stop growing once the tree reaches this many nodes
   rootIterations: 3,    // depth of the root system
@@ -306,6 +313,72 @@ export function generate(grid, startGi, config, hooks) {
 
 // ---------- Growth ----------
 
+// How far a shoot gets before it runs into the tree it grew from.
+//
+// Tips grow into open air, but old wood sits in the middle of the crown where
+// the lattice is already full of branch. `connectAt` refuses an edge between
+// two nodes that both already carry one — that would close a loop — so a
+// shoot running into existing structure gets silently dropped part-way and
+// leaves the rest of itself floating unattached. Finding the collision first
+// is cheaper than repairing after.
+//
+// What comes back is a length, not a yes/no, because a shoot that only half
+// fits is still a shoot: it opens, takes what room there is, and stops. That
+// is the honest answer for a crowded crown, where insisting on the whole
+// word would mean almost no bud ever broke at all. Every prefix is connected
+// — a move sets out from either the node the bud broke from or a point an
+// earlier move in the run already made — so a truncated shoot hangs off the
+// limb exactly like a complete one.
+//
+// Only landing points are tested; joining a fresh point to either of those
+// starting places is always allowed.
+function clearRun(moves, occupied) {
+  const fresh = new Set();
+  for (let i = 0; i < moves.length; i++) {
+    const { to } = moves[i];
+    if (occupied.has(to) && !fresh.has(to)) return i;
+    fresh.add(to);
+  }
+  return moves.length;
+}
+
+// Which way a bud on old wood should break, best first.
+//
+// Aiming a shoot straight up is what a tree reaching for light suggests, and
+// it is almost always wrong here: the limb bearing the bud is itself heading
+// roughly that way, so the shoot's first step lands on the very node the limb
+// carries on to and the whole thing is refused before it starts. A bud does
+// not open into its own branch — it opens where there is a gap.
+//
+// So candidate headings across the shoot's hemisphere are ranked by angular
+// clearance from the wood already leaving this node, less a mild pull back
+// toward the vertical axis so that, among equally open directions, the one
+// facing the light wins. The seeded nudge keeps two equally clear gaps from
+// always resolving the same way. The caller walks the list until a shoot
+// fits.
+//
+// `axis` is -90 for a canopy shoot, +90 for a root one.
+function sproutHeadings(grid, m, byId, id, here, axis, rng) {
+  const wood = [];
+  for (const other of [m.parent.get(id), ...(m.children.get(id) || [])]) {
+    const on = other ? byId.get(other) : null;
+    const p = on ? grid.point(on.gi) : null;
+    if (!p) continue;
+    wood.push((Math.atan2(p.y - here.y, p.x - here.x) * 180) / Math.PI);
+  }
+
+  const candidates = [];
+  for (let off = -75; off <= 75; off += 15) {
+    const heading = axis + off;
+    let clear = 180;
+    for (const w of wood) clear = Math.min(clear, Math.abs(angleDelta(heading, w)));
+    candidates.push({ heading, score: clear - Math.abs(off) * 0.15 + rng() * 8 });
+  }
+
+  candidates.sort((a, b) => b.score - a.score);
+  return candidates.map((c) => c.heading);
+}
+
 // Extend an existing tree by one season's worth of growth.
 //
 // Rather than regenerating from the axiom — which would throw away the tree
@@ -313,6 +386,9 @@ export function generate(grid, startGi, config, hooks) {
 // step at each *tip*, continuing in the direction that tip was already
 // heading. Structure you drew or grew in earlier years survives untouched;
 // only the ends move outward, which is how a tree actually thickens up.
+//
+// Tips are not the only place growth starts: mature wood can break a new
+// shoot part-way along a limb — that pass runs first, below.
 //
 // Growth is seeded, so a given year always grows the same way. `growChance`
 // thins which tips take, so a tree does not double every spring.
@@ -329,7 +405,7 @@ export function extendTips(grid, tree, m, config, hooks) {
 
   const limit = cfg.growLimit ?? 700;
   if (tree.nodes.length >= limit) {
-    return { ok: true, grown: 0, tips: 0, capped: true };
+    return { ok: true, grown: 0, tips: 0, sprouts: 0, capped: true };
   }
 
   const byId = new Map(tree.nodes.map((n) => [n.id, n]));
@@ -369,12 +445,114 @@ export function extendTips(grid, tree, m, config, hooks) {
   let grown = 0;
   let tips = 0;
 
-  // Snapshot the tips first: growth adds nodes, and newly grown tips must
-  // not grow again within the same season.
+  // Has this season used up its node budget?
+  //
+  // `hooks.edge` writes straight into the tree, so once anything has grown
+  // its length is the exact count and the only thing worth reading. `grown`
+  // is not a substitute: it counts branch segments emitted, and a segment
+  // landing on a point the tree already holds adds no node — so over a full
+  // season it can run at twice the nodes actually gained. Adding the two
+  // together, as this used to, therefore trips the limit at around half its
+  // value, and the pass that pays for that is whichever one runs second.
+  //
+  // A caller that only watches the moves and never writes them leaves the
+  // tree flat; `grown` is the fallback there, an over-count that stops early
+  // rather than never, which is the safe way for a guard to be wrong.
+  const startNodes = tree.nodes.length;
+  const atLimit = () =>
+    (tree.nodes.length > startNodes ? tree.nodes.length : startNodes + grown) >= limit;
+
+  // ---------- Shoots from old wood ----------
+  //
+  // This runs before the tips, and has to. A tree that only extends at its
+  // ends hollows out: wood at `matureOrder` bears no foliage and sheds its
+  // twigs, so year on year the inside of the crown empties and the canopy
+  // retreats to a shell. Real trees answer that with epicormic shoots —
+  // dormant buds under the bark of old wood breaking out into new leafy
+  // growth part-way along a limb, rather than at its end.
+  //
+  // A node qualifies when it is mature *and* the wood carries on past it.
+  // Strahler order never rises as you move outward, so a node's parent is at
+  // least its equal and a mature node with a mature child therefore sits
+  // strictly between two mature nodes — inside the zone rather than on its
+  // edge. The frontier where maturity runs out is left alone: it is nearly a
+  // tip already, and tips have their own rule below.
+  //
+  // Going first is what makes the rule mean anything. Tip growth is
+  // exponential and the season's node budget is shared, so left until
+  // afterwards a shoot would only ever get the scraps of a young tree and
+  // nothing at all from the year the crown fills out — which is the year the
+  // tree first has old wood to break from. A handful of buds cost little and
+  // spring breaks them early; the tips can have what is left.
+  //
+  // What a shoot becomes is left to the same rules as everything else. A
+  // forked one carries enough wood to outlast winter's twig cull; a single
+  // strand is an order-1 twig off mature wood, which is exactly what that
+  // cull takes. Weak shoots are shed and strong ones stay, without either
+  // being special-cased here.
+  let sprouts = 0;
+  const sproutChance = Math.max(0, Math.min(1, cfg.sproutChance ?? 0));
+  const matureOrder = Math.max(0, Math.floor(cfg.matureOrder) || 0);
+  const sproutRoll = cfg.sproutRoll || (() => 0);
+
+  if (sproutChance > 0 && matureOrder >= 2) {
+    const occupied = new Set(tree.nodes.map((n) => n.gi));
+
+    for (const id of m.order) {
+      if (atLimit()) break;
+      if (id === tree.rootId) continue;
+      if ((m.strahler.get(id) || 1) < matureOrder) continue;
+      const kids = m.children.get(id) || [];
+      if (!kids.some((c) => (m.strahler.get(c) || 1) >= matureOrder)) continue;
+      if (sproutRoll(id) >= sproutChance) continue;
+
+      const node = byId.get(id);
+      const here = node ? grid.point(node.gi) : null;
+      if (!here) continue;
+      const underground = tree.horizonY != null && here.y > tree.horizonY;
+
+      // Its own named stream, so re-rolling where shoots aim disturbs nothing
+      // else and no two buds on a limb open the same way.
+      const aim = sub(cfg.seed != null ? cfg.seed : 1,
+        STREAMS.LSYSTEM + ':sprout:' + id);
+
+      // Take the direction that gives the shoot the longest clear run, out of
+      // the openest few. Trying only a handful is the point: past that the
+      // ranking has run out of gaps, and a bud with nowhere to go stays
+      // dormant rather than being forced somewhere implausible.
+      let taken = null;
+      for (const heading of
+        sproutHeadings(grid, m, byId, id, here, underground ? 90 : -90, aim).slice(0, 5)) {
+        const { moves } = turtle(word, grid, node.gi, {
+          ...cfg,
+          heading,
+          stream: id + ':sprout',
+          upOnly: !underground,
+          downOnly: underground,
+          step: underground ? (cfg.step ?? 2) * (cfg.rootScale ?? 0.75) : cfg.step,
+        });
+        const run = clearRun(moves, occupied);
+        if (run && (!taken || run > taken.length)) taken = moves.slice(0, run);
+        if (taken && taken.length === moves.length) break;   // nothing to beat
+      }
+      if (!taken) continue;
+
+      sprouts += 1;
+      for (const mv of taken) {
+        hooks.edge(mv.from, mv.to);
+        occupied.add(mv.to);
+        grown += 1;
+      }
+    }
+  }
+
+  // Snapshot the tips before extending any: growth adds nodes, and newly
+  // grown tips — shoots included — must not grow again within the same
+  // season.
   const terminals = [...m.terminal];
 
   for (const id of terminals) {
-    if (tree.nodes.length + grown >= limit) break;
+    if (atLimit()) break;
     if (id === tree.rootId) continue;
 
     const node = byId.get(id);
@@ -438,5 +616,5 @@ export function extendTips(grid, tree, m, config, hooks) {
     }
   }
 
-  return { ok: true, grown, tips, capped: tree.nodes.length >= limit };
+  return { ok: true, grown, tips, sprouts, capped: atLimit() };
 }
