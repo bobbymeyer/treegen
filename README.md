@@ -1,92 +1,105 @@
 # treegen
 
-A tool for growing trees on a grid.
-
-Points snap to a lattice; a branch is a straight line between two of them, at
-whatever angle and length that takes. Vegetation is never placed by hand — every
-leaf, blossom and fruit comes from rules evaluated against the graph. Four
-seasons animate a single set of objects rather than four unrelated pictures, and
-a tree can be left to grow year on year.
+get in touch with nature without touching any nature
 
 [**Open it →**](https://bobbymeyer.github.io/treegen/)
 
-## How it works
+## quickstart
 
-**Only the points snap to the grid.** An edge is a straight segment between two
-of them and is not walked along the lattice, so nothing staircases. Four grid
-types sit behind one interface: square, hex, triangle, and a seeded Voronoi
-whose adjacency is the Delaunay dual of its sites.
+Nothing to install and nothing to build. Open `index.html`, or serve the
+folder:
 
-**Structure is drawn, grown, or both.** Click to place points, drag a node to
-move it and everything downstream with it, right-click to cut a limb and
-everything past it. Or grow one from an L-system: axiom, production rules, angle
-and segment length, with a variation control that wobbles branches without
-walking the trunk sideways.
-
-**Vegetation is rules only.** There is no way to put a leaf somewhere. Foliage
-comes from depth, tip-versus-interior, Strahler order and a seeded roll, so the
-same rules work identically whether you drew the tree or grew it. Leaves fill
-whole lattice cells, so the canopy reads as a mass on the grid rather than
-scattered marks.
-
-**Colour runs in two stages.** Every object takes a grayscale tone from its
-position in the graph, knowing nothing about colour; a separate step maps tone
-onto a swatch. That split means a palette change never disturbs the design
-underneath — and autumn needs no special machinery, being stage two re-run
-against a different swatch list.
-
-**The trunk is found, not drawn.** From the root, follow the dominant branch at
-every fork — highest Strahler order, which is what "main channel" means in a
-branching network. It bears no foliage, so the main stem reads as wood.
-
-**Seasons run forward in order,** with each object keeping a stable identity
-across all four, which is what makes the transitions continuous. Winter drops
-every leaf on a sine path with the swing narrowing as it falls, fading out
-before it reaches the ground line.
-
-**A growing tree renews.** Each spring it extends from its tips rather than
-regenerating, so earlier years survive. Branches mature: once a limb passes a
-Strahler threshold it stops bearing foliage and sheds its fine twigs, which come
-away in winter with the leaves. That is what opens the inside of an older crown.
-
-**Old wood still breaks buds.** A tree growing only at its ends would hollow
-out, so mature wood has a set chance each spring of putting out a fresh shoot
-part-way along a limb — between two nodes that have both passed the maturity
-threshold, never at the frontier where it runs out. The bud opens into the
-widest gap in the wood already leaving that node, and takes what room the
-lattice gives it. Nothing marks a shoot afterwards: a forked one is limb enough
-to last, a single strand is a twig on old wood and winter takes it, which is
-roughly what becomes of the real thing.
-
-**Everything stochastic is seeded.** Voronoi sites, the L-system, placement,
-tone, palette substitution, growth, and every leaf's fall each draw from their
-own named stream — so rolling one never disturbs another, and the same seed
-always gives the same tree.
-
-## Running it
-
-Nothing to install and nothing to build. Open `index.html`, or serve the folder:
-
-```bash
+```sh
 python3 -m http.server
 ```
 
-Tests are headless and need only Node:
-
-```bash
-npm test
+```sh
+npm test        # headless, Node >= 22.12
 ```
 
-The engine is DOM-free by construction, and the renderer draws through an
-injected element factory — so the same drawing code runs in the browser and in
-the tests, and there is no second implementation to drift. The suite also writes
-`test/treegen-proof.html`, a rendering of all four seasons you can open.
+## the canvas
 
-## Embedding it
+| Do this | Get this |
+| --- | --- |
+| Click empty space | Place a point. **The first point sets the horizon** — above it is canopy, below is root |
+| Hover a point | Reveal it; points stay invisible otherwise |
+| Drag a point | Move it and everything downstream with it; the branch above stretches |
+| Right-click a point | Cut it, and everything past it |
 
-`treegen.js` is an ES module and boots itself against `#treegen` markup on its
-own page. To run it inside something else, take the markup from `index.html`,
-load `treegen.css`, and drive it yourself:
+Only the points snap to the lattice. A branch is a straight segment between
+two of them at whatever angle and length that takes, so nothing staircases.
+
+## toolbar
+
+| Control | Range | Does |
+| --- | --- | --- |
+| **structure** | | |
+| lattice | square, hex, triangle, voronoi | The grid points snap to. Voronoi adjacency is the Delaunay dual of its sites |
+| trunk | 1–6, default 2 | Strahler order at which the stem stops counting as trunk. Higher ends the trunk lower |
+| clear | | Empty the canvas |
+| **look** | | |
+| roll seed | | New seed. Changes the canopy without touching the tree you drew |
+| palette | orchard, slate, ember, ink | Swatch list for leaf, fall, blossom and fruit |
+| layers | 0–5, default 2 | Rings of lattice cells around each branch that can hold foliage |
+| **season** | | |
+| next season | | Advance one season |
+| grow | off | Extend the tree by one L-system step each spring |
+| sprout | 0–100, default 25 | Chance per spring that mature wood breaks a bud part-way along a limb |
+| auto | off | Advance on a timer |
+| interval | 1–60s, default 4 | Seconds per season |
+| **file** | | |
+| save json | | The document. This is what round-trips |
+| load | | Read a saved document |
+| export svg | | Snapshot of the current season. One-way — it cannot be loaded back |
+
+### l-system
+
+| Field | Default | Is |
+| --- | --- | --- |
+| axiom | `F` | Starting string |
+| rules | `F -> F[+F][-F]F` | Production rules, one per line |
+| iterations | 5, max 8 | Expansion passes |
+| angle | 35°, 5–120 | Turn per `+` or `-` |
+| segment | 2, 1–8 | Branch length, in grid steps |
+| variation | 35, 0–100 | How far branches may depart from the exact rule |
+| roots | 3, 0–6 | Depth of the root system below the horizon; 0 for none |
+
+## how it behaves
+
+**Vegetation is rules only.** There is no way to place a leaf. Foliage comes
+from depth, tip-versus-interior, Strahler order and a seeded roll — properties
+of shape alone, so the same rules apply whether you drew the tree or grew it.
+Leaves fill whole lattice cells.
+
+**Colour runs in two stages.** Every object takes a grayscale tone from its
+position in the graph, knowing nothing about colour; a second stage maps tone
+onto a swatch. Changing palette never disturbs the design underneath, and fall
+is stage two re-run against a different swatch list.
+
+**The trunk is found, not drawn.** From the root, follow the highest Strahler
+order at every fork. That path bears no foliage.
+
+**Seasons run forward in order** — spring, summer, fall, winter, then the next
+year. Each object keeps a stable identity across all four. Winter drops every
+leaf on a sine path, the swing narrowing as it falls, fading out before the
+ground line.
+
+**Growth extends from the tips**, so earlier years survive. Past a Strahler
+threshold a limb stops bearing foliage and sheds its fine twigs, which come
+away in winter with the leaves. Mature wood also breaks buds part-way along a
+limb, at the `sprout` chance, opening into the widest gap in the wood already
+leaving that node.
+
+**Everything stochastic is seeded.** Voronoi sites, the L-system, placement,
+tone, palette substitution, growth and every leaf's fall each draw from their
+own named stream, so rolling one never disturbs another and the same seed
+always gives the same tree.
+
+## embedding it
+
+`treegen.js` is an ES module that boots itself against `#treegen` markup on
+its own page. To run it inside something else, take the markup from
+`index.html`, load `treegen.css`, and drive it:
 
 ```js
 window.__treegenEmbedded = true;   // before the import: don't self-boot
@@ -97,13 +110,13 @@ initTreegen();        // no-ops when the markup isn't on the page
 destroyTreegen();     // before the host removes it
 ```
 
-This is how [bobbymeyer.com](https://bobbymeyer.com) runs it: loaded from this
-deploy rather than vendored, so there is one copy rather than two that drift.
+This is how bobbymeyer.com runs it — loaded from this deploy rather than
+vendored.
 
-## Files
+## files
 
 | | |
-|---|---|
+| --- | --- |
 | `rng.js` | mulberry32, named sub-streams, per-object streams |
 | `grid.js` | the four lattices, adjacency, Poisson-disc + Delaunay |
 | `tree.js` | the node graph, depth, Strahler order, trunk, pruning |
@@ -113,6 +126,15 @@ deploy rather than vendored, so there is one copy rather than two that drift.
 | `animate.js` | the season clock and every transition |
 | `treegen.js` | document, toolbar, and what holds it together |
 
-## License
+## tech
+
+ES modules, no dependencies, no build. Node >= 22.12 for the tests, which run
+through `node --test`: 95 passing.
+
+The engine is DOM-free and the renderer draws through an injected element
+factory, so the same drawing code runs in the browser and in the tests. The
+suite writes `test/treegen-proof.html`, a rendering of all four seasons.
+
+## license
 
 MIT.
