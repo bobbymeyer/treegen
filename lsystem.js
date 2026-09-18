@@ -54,6 +54,14 @@ export const LSYSTEM_DEFAULTS = {
   // foliage rules use and is passed in by the caller rather than kept here
   // twice — with none given, nothing sprouts.
   sproutChance: 0.25,   // chance a mature node breaks a new shoot each spring
+
+  // How much of the bole carries no buds at all, as a fraction of the crown's
+  // height. Without this the rule above leafs up the trunk every spring —
+  // the lower stem is the oldest wood a tree has, so it is the first place a
+  // maturity threshold points at, and shoots there cancel the one thing that
+  // was lifting the crown. A stem hung with sprouts to the ground is a real
+  // tree, but it is a stressed one; a forest tree carries a clean bole.
+  sproutClear: 0.35,
   balance: 0.8,         // how strongly growth favours the lighter side, 0..1
   growLimit: 700,       // stop growing once the tree reaches this many nodes
   rootIterations: 3,    // depth of the root system
@@ -536,9 +544,23 @@ export function extendTips(grid, tree, m, config, hooks) {
   const sproutChance = Math.max(0, Math.min(1, cfg.sproutChance ?? 0));
   const matureOrder = Math.max(0, Math.floor(cfg.matureOrder) || 0);
   const sproutRoll = cfg.sproutRoll || (() => 0);
+  const sproutClear = Math.max(0, Math.min(1, cfg.sproutClear ?? 0));
 
   if (sproutChance > 0 && matureOrder >= 2) {
     const occupied = new Set(tree.nodes.map((n) => n.gi));
+
+    // The clear zone is measured against the crown rather than in lattice
+    // steps, so a sapling and an old tree keep the same proportions and only
+    // the old one has a bole worth clearing.
+    let crownTop = null;
+    if (sproutClear > 0 && tree.horizonY != null) {
+      for (const n of tree.nodes) {
+        const p = grid.point(n.gi);
+        if (!p || p.y > tree.horizonY) continue;
+        if (crownTop == null || p.y < crownTop) crownTop = p.y;
+      }
+    }
+    const crownHeight = crownTop == null ? 0 : tree.horizonY - crownTop;
 
     for (const id of m.order) {
       if (atLimit()) break;
@@ -546,12 +568,20 @@ export function extendTips(grid, tree, m, config, hooks) {
       if ((m.strahler.get(id) || 1) < matureOrder) continue;
       const kids = m.children.get(id) || [];
       if (!kids.some((c) => (m.strahler.get(c) || 1) >= matureOrder)) continue;
-      if (sproutRoll(id) >= sproutChance) continue;
 
       const node = byId.get(id);
       const here = node ? grid.point(node.gi) : null;
       if (!here) continue;
       const underground = tree.horizonY != null && here.y > tree.horizonY;
+
+      // Nothing breaks low on the bole. Roots are exempt: below ground there
+      // is no bole and no light to have been shaded out of.
+      if (!underground && crownHeight > 0) {
+        const rise = (tree.horizonY - here.y) / crownHeight;
+        if (rise < sproutClear) continue;
+      }
+
+      if (sproutRoll(id) >= sproutChance) continue;
 
       // Its own named stream, so re-rolling where shoots aim disturbs nothing
       // else and no two buds on a limb open the same way.
