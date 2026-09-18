@@ -288,6 +288,17 @@
 
 /* While a drag is in progress, show every point so you can see where the
    node may land. */
+/* The empty-stage prompt. Left-aligned like every other piece of text here,
+   and in the same grey as the lattice so it reads as chrome, not drawing. */
+.tg-hint {
+  fill: #9a9a9a;
+  text-anchor: start;
+  font-family: inherit;
+  letter-spacing: 0.01em;
+  pointer-events: none;
+  user-select: none;
+}
+
 .tg-stage.is-dragging .tg-handle {
   opacity: 0.45;
 }

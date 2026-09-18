@@ -354,6 +354,22 @@ export function renderToString(tree, grid, objects, opts = {}) {
 //   onMove(id, gi)     node dragged to a new point
 //   onDelete(id)       right-click on a node: cut it and everything past it
 //   canMoveTo(id, gi)  -> bool, whether that point is free
+// The prompt shown on a stage with nothing on it. Sized against the view
+// rather than the screen so it holds its proportions as the world grows, and
+// set where a seedling would stand — left of centre, above the middle — so it
+// reads as a caption on the field rather than a dialog over it.
+function emptyHint(grid, frame) {
+  const f = frame || { x: 0, y: 0, w: grid.width, h: grid.height };
+  const node = domEl('text', {
+    class: 'tg-hint',
+    x: (f.x + f.w * 0.08).toFixed(1),
+    y: (f.y + f.h * 0.46).toFixed(1),
+    'font-size': Math.max(11, f.w * 0.03).toFixed(1),
+  });
+  node.textContent = 'click to plant a seed';
+  return node;
+}
+
 export function createCanvas(host, callbacks = {}) {
   const svg = domEl('svg', {
     class: 'tg-stage',
@@ -534,6 +550,12 @@ export function createCanvas(host, callbacks = {}) {
       }
       fill(layers.branches, branches);
       fill(layers.overlay, handleNodes(tree, grid, domEl));
+
+      // An empty stage is indistinguishable from a broken one, so it says
+      // what to do with it. This lives on the canvas rather than in the
+      // status line because the canvas is the thing you have to click, and
+      // it goes the moment there is a seed to look at instead.
+      if (!tree.nodes.length) layers.overlay.appendChild(emptyHint(grid, current.frame));
     },
 
     frame() {

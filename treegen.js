@@ -49,7 +49,7 @@ function defaultDoc() {
     grid: { ...GRID_DEFAULTS },
     tree: makeTree(),
     palette: 'orchard',
-    grow: false,          // extend the tree by one production step each spring
+    grow: true,           // extend the tree by one production step each spring
     // Mirrors the engine's placement defaults for every value the app reads
     // back out of the document. A key missing here reads as undefined and the
     // rule silently never fires.
@@ -109,7 +109,16 @@ function boot(root) {
 
   const canvas = createCanvas(stage, {
     onAdd: (gi) => {
+      // The first point on an empty stage is a seed rather than a drawing
+      // move, and a seed that sits inert until the clock happens to come
+      // round to spring — four seasons away, if you planted it in one —
+      // reads as a click that did nothing. So it germinates on the spot.
+      //
+      // Only while `grow` is on: with it off the tool is a drawing board,
+      // and a first click that unfolds a whole sapling would take that away.
+      const planting = !doc.tree.nodes.length && doc.grow;
       addNodeAt(doc.tree, grid, gi);
+      if (planting) growOneYear(doc.year);
       refresh({ structure: true });
     },
     onMove: (id, gi) => {
@@ -135,6 +144,11 @@ function boot(root) {
     onYear: (year) => {
       doc.year = year;
       if (doc.grow) growOneYear(year);
+      // The year readout is driven from the document, and only the manual
+      // "next season" button used to push it back out — which went unnoticed
+      // while the clock was something you stepped by hand. Running on its own
+      // by default, it would sit on year 1 for ever.
+      syncReadouts();
       saveDraft();
     },
     // A new year re-rolls the canopy — and, if growing, does it on a bigger
@@ -188,6 +202,11 @@ function boot(root) {
   // continuing the direction that tip was heading. Seeded on the year, so a
   // given year always grows the same way.
   function growOneYear(year) {
+    // Nothing planted: the seasons still turn, but silently. Reporting a
+    // year that grew nothing every time round would scroll the prompt for
+    // planting something off the status line.
+    if (!doc.tree.nodes.length) return;
+
     // Winter has just finished dropping the shed limbs; now actually take
     // them off the tree, so what fell does not reappear in spring.
     let culled = 0;
@@ -234,6 +253,12 @@ function boot(root) {
       canopyLayers: doc.rules.placement.layers,
     });
     const added = doc.tree.nodes.length - before;
+    if (result.germinated) {
+      say(added
+        ? 'the seed took — a shoot above ground and roots below'
+        : 'the seed found no room to germinate — try planting further in');
+      return;
+    }
     const shed = culled ? `, shed ${culled} over winter` : '';
     const broke = result.sprouts
       ? `, ${result.sprouts} shoot${result.sprouts > 1 ? 's' : ''} off old wood`
@@ -505,6 +530,9 @@ function boot(root) {
     };
     auto?.addEventListener('change', applyAuto);
     interval?.addEventListener('change', applyAuto);
+    // The checkbox ships checked, and `change` never fires for a default —
+    // so without this the box would read "auto" while the clock sat still.
+    applyAuto();
 
     $('#tg-clear')?.addEventListener('click', () => {
       doc.tree = makeTree();
@@ -621,7 +649,8 @@ function boot(root) {
   refresh({ structure: true });
 
   if (!hadDraft || !doc.tree.nodes.length) {
-    say('click to place the first point — it sets the horizon');
+    // The stage itself carries the prompt now; this adds what it can't fit.
+    say('the first point sets the horizon — everything above it is canopy');
   } else {
     say('');
   }
