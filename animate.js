@@ -406,34 +406,51 @@ export function createAnimator(canvas, callbacks = {}) {
     start();
   }
 
+  // Open a growing year: grow, re-roll the canopy, and come into spring.
+  //
+  // Winter wraps into this, which is where it is usually reached from, but it
+  // is not only winter's to call. Planting a seed enters spring the same way
+  // — it is the same event, a tree putting on a year's growth and leafing out
+  // — and going through here is what makes a seed sprout as a season rather
+  // than simply appear.
+  //
+  // `intoYear` is which year is starting, so the caller decides whether that
+  // is the next one or the one already on the clock: winter is ending a year
+  // and so asks for the next, while planting is starting the first and asks
+  // for the one it is already on.
+  //
+  // The effective seed is seed + year, so every year is different while each
+  // individual year stays perfectly reproducible.
+  function beginYear(intoYear) {
+    year = intoYear;
+    if (callbacks.onYear) callbacks.onYear(year);
+    if (callbacks.rebuild) {
+      const fresh = callbacks.rebuild(year);
+      if (fresh && fresh.objects) {
+        // A growing tree can also move to a larger world, so take the grid
+        // and tree back if the caller replaced them.
+        if (fresh.grid) grid = fresh.grid;
+        if (fresh.tree) tree = fresh.tree;
+        objects = fresh.objects;
+        canvas.setFoliage(objects, grid);
+      }
+    }
+    // The limbs that fell are gone; the caller has removed them by now.
+    branches = [];
+    branchPlan = null;
+    colorsTo = new Map();
+    // Come into spring *from* winter whatever the clock said, so the canopy
+    // fades up from nothing rather than cross-fading out of some other season.
+    season = 'winter';
+    for (const obj of objects) canvas.applyState(obj, { opacity: 0 });
+    transitionTo('spring');
+  }
+
   // Advance one step in the fixed order, wrapping the year after winter.
   function next() {
     const idx = SEASONS.indexOf(season);
     if (idx === SEASONS.length - 1) {
-      // Winter -> spring. A new year re-rolls the canopy on the same trunk:
-      // effective seed is seed + year, so every year is different but each
-      // individual year is perfectly reproducible.
-      year += 1;
-      if (callbacks.onYear) callbacks.onYear(year);
-      if (callbacks.rebuild) {
-        const fresh = callbacks.rebuild(year);
-        if (fresh && fresh.objects) {
-          // A growing tree can also move to a larger world, so take the
-          // grid and tree back if the caller replaced them.
-          if (fresh.grid) grid = fresh.grid;
-          if (fresh.tree) tree = fresh.tree;
-          objects = fresh.objects;
-          canvas.setFoliage(objects, grid);
-        }
-      }
-      // The limbs that fell are gone; the caller has removed them by now.
-      branches = [];
-      branchPlan = null;
-      colorsTo = new Map();
-      season = 'winter';
-      // Everything starts invisible, then spring fades it in.
-      for (const obj of objects) canvas.applyState(obj, { opacity: 0 });
-      transitionTo('spring');
+      beginYear(year + 1);
       return;
     }
     transitionTo(SEASONS[idx + 1]);
@@ -466,6 +483,7 @@ export function createAnimator(canvas, callbacks = {}) {
 
     next,
     goTo: transitionTo,
+    beginYear,
 
     setAutoplay(on, seconds) {
       autoplay = !!on;

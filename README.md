@@ -22,13 +22,17 @@ npm test        # headless, Node >= 22.12
 | Do this | Get this |
 | --- | --- |
 | Click empty space | Place a point. **The first point sets the horizon** — above it is canopy, below is root |
-| Click an empty canvas | Plant a seed. With **grow** on it germinates at once, putting up a shoot and putting down roots; with grow off it is just the first point, and you draw |
+| Click an empty canvas | Plant a seed. With **grow** on the season turns to spring a moment later and the seed grows into it — a shoot up, roots down; with grow off it is just the first point, and you draw |
 | Hover a point | Reveal it; points stay invisible otherwise |
 | Drag a point | Move it and everything downstream with it; the branch above stretches |
 | Right-click a point | Cut it, and everything past it |
 
 Only the points snap to the lattice. A branch is a straight segment between
 two of them at whatever angle and length that takes, so nothing staircases.
+
+The stage tints from the horizon outward — sky above, earth below, both
+fading to nothing as they go. The horizon is set by the first point, so an
+empty canvas has no ground to show.
 
 ## toolbar
 
