@@ -49,7 +49,7 @@ empty canvas has no ground to show.
 | **season** | | |
 | next season | | Advance one season |
 | grow | **on** | Extend the tree by one L-system step each spring. Also what makes a planted seed germinate |
-| sprout | 0–100, default 25 | Chance per spring that mature wood breaks a bud part-way along a limb |
+| sprout | 0–100, default 25 | Chance per spring that mature wood breaks a bud part-way along a limb. The lowest third of the crown is left clear, so the bole stays bare |
 | auto | **on** | Advance on a timer |
 | interval | 1–60s, default 1 | Seconds per season |
 | **file** | | |

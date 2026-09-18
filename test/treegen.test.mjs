@@ -823,7 +823,7 @@ test('an empty stage has nothing to germinate', () => {
 // One season on a tree old enough to have mature wood. Every node the rule
 // offers a bud to is recorded on the way past, so a test can check what was
 // picked rather than trying to infer it from the result.
-function season(sproutChance, matureOrder, seed = 9) {
+function season(sproutChance, matureOrder, seed = 9, extra = {}) {
   const grid = makeGrid({ type: 'square', width: 2400, height: 1800, spacing: 20 });
   const tree = makeTree();
   const start = grid.nearest(1200, 1550);
@@ -834,10 +834,18 @@ function season(sproutChance, matureOrder, seed = 9) {
 
   const offered = [];
   const before = metrics(tree);
+
+  let crownTop = null;
+  for (const n of tree.nodes) {
+    const p = grid.point(n.gi);
+    if (!p || p.y > tree.horizonY) continue;
+    if (crownTop == null || p.y < crownTop) crownTop = p.y;
+  }
+  const crownHeight = tree.horizonY - crownTop;
   const res = extendTips(grid, tree, before,
     { rules: 'F -> F[+F][-F]F', angle: 35, step: 2, seed, jitter: 35,
       growChance: 0.65, rootGrowChance: 0.3, balance: 0.8,
-      sproutChance, matureOrder,
+      sproutChance, matureOrder, ...extra,
       roll: (id) => objRng(seed, id, 'grow')(),
       sproutRoll: (id) => {
         offered.push(id);
@@ -845,7 +853,7 @@ function season(sproutChance, matureOrder, seed = 9) {
       } },
     { edge: (a, b) => connectAt(tree, grid, a, b) });
 
-  return { grid, tree, before, after: metrics(tree), res, offered };
+  return { grid, tree, before, after: metrics(tree), res, offered, crownHeight };
 }
 
 test('shoots break from between mature nodes, never anywhere else', () => {
@@ -872,6 +880,54 @@ test('shoots break from between mature nodes, never anywhere else', () => {
   // A shoot joins the tree it came off: no loop, and nothing left floating.
   assert.equal(run.tree.edges.length, run.tree.nodes.length - 1, 'a shoot closed a loop');
   assert.equal(run.after.order.length, run.tree.nodes.length, 'a shoot floated free');
+});
+
+// How high each node stands in the crown, 0 at the horizon and 1 at the top.
+//
+// Measured against the crown as it stood when the pass ran, not as it ended
+// up. Growth only adds, so a node keeps the point it had — but the season's
+// own growth makes the crown taller, and measuring against the finished tree
+// reads every node as lower than the rule saw it.
+function riseOf(run) {
+  const height = run.crownHeight;
+  return (id) => {
+    const node = run.tree.nodes.find((n) => n.id === id);
+    const p = node && run.grid.point(node.gi);
+    if (!p || p.y > run.tree.horizonY) return null;   // a root: no bole, exempt
+    return (run.tree.horizonY - p.y) / height;
+  };
+}
+
+// The lower stem is the oldest wood a tree has, so a maturity threshold points
+// at it first and shoots there leaf up the one part that should read as bare.
+test('no bud breaks low on the bole', () => {
+  const CLEAR = 0.5;
+  const run = season(1, 3, 9, { sproutClear: CLEAR });
+  const rise = riseOf(run);
+
+  assert.ok(run.offered.length > 0, 'nothing was offered a bud at all');
+  for (const id of run.offered) {
+    const r = rise(id);
+    if (r == null) continue;          // roots keep their own rule
+    assert.ok(r >= CLEAR, `a bud was offered at ${(r * 100).toFixed(0)}% of crown height`);
+  }
+});
+
+test('the clear zone is what holds the bole, not the maturity rule', () => {
+  // Same season with the zone off: the wood low on the stem qualifies and is
+  // offered buds, which is the behaviour the zone exists to withhold.
+  const open = season(1, 3, 9, { sproutClear: 0 });
+  const rise = riseOf(open);
+  const low = open.offered.filter((id) => {
+    const r = rise(id);
+    return r != null && r < 0.5;
+  });
+  assert.ok(low.length > 0, 'the low stem was never eligible, so the zone proves nothing');
+
+  // And with it on, those same nodes are refused while shoots still happen.
+  const cleared = season(1, 3, 9, { sproutClear: 0.5 });
+  assert.ok(cleared.offered.length < open.offered.length, 'the zone withheld nothing');
+  assert.ok(cleared.res.sprouts > 0, 'the zone took every shoot, not just the low ones');
 });
 
 test('shoots are seeded, and stay put without a maturity threshold', () => {
