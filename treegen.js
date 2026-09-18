@@ -33,6 +33,11 @@ const DOC_VERSION = 1;
 // path, so a large point count costs geometry rather than DOM nodes. It is
 // high enough that a tree growing for many years keeps zooming instead of
 // overrunning its world.
+// How long a planted seed is left alone before spring comes for it. Long
+// enough to register as a seed you put there, short enough that it never
+// reads as a click that missed.
+const SPROUT_DELAY = 550;
+
 const MARGIN_CELLS = 2;
 const GROW_BY = 1.3;
 const MAX_POINTS = 26000;
@@ -103,6 +108,9 @@ function boot(root) {
   let doc = defaultDoc();
   let grid = makeGrid(doc.grid);
   let objects = [];
+  // Pending "the seed is about to sprout" beat, so a teardown can cancel it
+  // rather than waking against a canvas that is no longer on the page.
+  let sprouting = 0;
 
   const stage = $('#tg-canvas');
   const statusEl = $('#tg-status');
@@ -111,15 +119,21 @@ function boot(root) {
     onAdd: (gi) => {
       // The first point on an empty stage is a seed rather than a drawing
       // move, and a seed that sits inert until the clock happens to come
-      // round to spring — four seasons away, if you planted it in one —
-      // reads as a click that did nothing. So it germinates on the spot.
+      // round to spring — four seasons away, if you planted it in one — reads
+      // as a click that did nothing.
       //
-      // Only while `grow` is on: with it off the tool is a drawing board,
-      // and a first click that unfolds a whole sapling would take that away.
+      // So planting brings spring forward to meet it. What it must not do is
+      // hand over a finished sapling: the point goes down first and is left
+      // to read as a seed for a beat, then the season turns and the tree
+      // grows into it, leafing up out of nothing the way every other spring
+      // does. Same path, same animation — planting is simply the first year.
+      //
+      // Only while `grow` is on: with it off the tool is a drawing board, and
+      // a first click that unfolded a whole sapling would take that away.
       const planting = !doc.tree.nodes.length && doc.grow;
       addNodeAt(doc.tree, grid, gi);
-      if (planting) growOneYear(doc.year);
       refresh({ structure: true });
+      if (planting) plantSeed();
     },
     onMove: (id, gi) => {
       if (moveNode(doc.tree, grid, id, gi)) refresh({ structure: true });
@@ -196,6 +210,20 @@ function boot(root) {
   function buildObjects(year = doc.year) {
     const m = metrics(doc.tree);
     return buildFoliage(doc, grid, doc.tree, m, effectiveSeed(year));
+  }
+
+  // A seed is in the ground: let it sit for a moment, then turn the season.
+  //
+  // `doc.year` is not advanced. Winter ends a year and asks for the next one;
+  // planting starts the first and asks for the one already on the clock, so a
+  // seed's first spring reads as year 1 rather than skipping to year 2.
+  function plantSeed() {
+    say('planted — waiting on spring');
+    clearTimeout(sprouting);
+    sprouting = setTimeout(() => {
+      sprouting = 0;
+      animator.beginYear(doc.year);
+    }, SPROUT_DELAY);
   }
 
   // One spring's structural growth: a single production step at each tip,
@@ -535,6 +563,8 @@ function boot(root) {
     applyAuto();
 
     $('#tg-clear')?.addEventListener('click', () => {
+      clearTimeout(sprouting);
+      sprouting = 0;
       doc.tree = makeTree();
       doc.year = 0;
       refresh({ structure: true });
@@ -659,6 +689,8 @@ function boot(root) {
     // Stop the animation loop and let go of the stage. The markup itself
     // belongs to the host, so it is left alone.
     destroy() {
+      clearTimeout(sprouting);
+      sprouting = 0;
       animator.destroy();
       if (stage) stage.replaceChildren();
     },

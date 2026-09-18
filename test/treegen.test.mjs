@@ -27,6 +27,7 @@ import {
 import { parseRules, expand, turtle, generate, extendTips } from '../lsystem.js';
 import {
   renderToString, branchNodes, foliageNodes, objectEl, transformFor, frameFor,
+  groundNodes,
 } from '../render.js';
 import {
   lerpHex, planTransition, planBranchFall, frameState, settledState, TIMING, WINTER,
@@ -624,6 +625,51 @@ test('growth stops at the limit and reports bad rules', () => {
   const inert = extendTips(grid, tree, metrics(tree), { rules: 'F -> F' }, { edge: () => {} });
   assert.equal(inert.ok, false);
   assert.match(inert.error, /no new growth/);
+});
+
+// ---------- sky and earth ----------
+
+test('the ground is two bands meeting exactly at the horizon', () => {
+  const { grid, tree } = fixture();
+  const frame = { x: 0, y: 0, w: grid.width, h: grid.height };
+  const [sky, earth] = groundNodes(tree, grid, objectEl, frame);
+
+  assert.ok(sky && earth, 'expected a sky band and an earth band');
+  assert.equal(sky.attrs.class, 'tg-sky');
+  assert.equal(earth.attrs.class, 'tg-earth');
+
+  // They meet on the horizon, with no seam and no overlap.
+  assert.equal(sky.attrs.y + sky.attrs.height, tree.horizonY, 'sky does not reach the horizon');
+  assert.equal(earth.attrs.y, tree.horizonY, 'earth does not start at the horizon');
+
+  // And between them they cover the whole view, so no untinted strip shows.
+  assert.equal(sky.attrs.y, frame.y);
+  assert.equal(earth.attrs.y + earth.attrs.height, frame.y + frame.h);
+  for (const band of [sky, earth]) {
+    assert.equal(band.attrs.x, frame.x);
+    assert.equal(band.attrs.width, frame.w);
+    assert.ok(band.attrs.height > 0, 'a band came out inside out');
+    assert.match(band.attrs.fill, /^url\(#tg-(sky|earth)\)$/);
+  }
+});
+
+test('an empty stage has no ground, and a view on one side of the horizon has one band', () => {
+  const { grid, tree } = fixture();
+
+  // Nothing planted: no horizon exists yet, so neither does the ground.
+  assert.deepEqual(groundNodes(makeTree(), grid, objectEl, null), []);
+
+  // Looking only at the canopy, there is nothing below to tint, and vice
+  // versa — the band that would be inside out is left out instead.
+  const above = groundNodes(tree, grid, objectEl,
+    { x: 0, y: 0, w: grid.width, h: tree.horizonY - 10 });
+  assert.equal(above.length, 1);
+  assert.equal(above[0].attrs.class, 'tg-sky');
+
+  const below = groundNodes(tree, grid, objectEl,
+    { x: 0, y: tree.horizonY + 10, w: grid.width, h: 100 });
+  assert.equal(below.length, 1);
+  assert.equal(below[0].attrs.class, 'tg-earth');
 });
 
 // ---------- germination ----------

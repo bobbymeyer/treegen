@@ -288,6 +288,13 @@
 
 /* While a drag is in progress, show every point so you can see where the
    node may land. */
+/* Sky and earth are scenery, not targets — a click anywhere on them still
+   places a point. */
+.tg-sky,
+.tg-earth {
+  pointer-events: none;
+}
+
 /* The empty-stage prompt. Left-aligned like every other piece of text here,
    and in the same grey as the lattice so it reads as chrome, not drawing. */
 .tg-hint {

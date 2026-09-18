@@ -17,7 +17,7 @@ import { metrics, trunkPath } from './tree.js';
 
 export const SVG_NS = 'http://www.w3.org/2000/svg';
 
-export const LAYER_ORDER = ['lattice', 'horizon', 'branches', 'foliage', 'overlay'];
+export const LAYER_ORDER = ['ground', 'lattice', 'horizon', 'branches', 'foliage', 'overlay'];
 
 // Default factory: real SVG elements.
 export function domEl(tag, attrs = {}) {
@@ -370,12 +370,77 @@ function emptyHint(grid, frame) {
   return node;
 }
 
+// Sky above the horizon, earth below it.
+//
+// Both tints are strongest at the horizon and fade out away from it, rather
+// than the other way round. That makes the horizon the anchor of the drawing
+// — the line the whole thing is built either side of — and leaves the top of
+// the view near-white, which is where the canopy is and where it needs the
+// contrast.
+//
+// They are alpha ramps over the stage rather than pale flat colours, so they
+// fade into whatever the stage is set to exactly, and the hues stay honestly
+// blue and brown instead of drifting toward cream as pale tints tend to. The
+// earth is deliberately on the red side of brown for the same reason: washed
+// out over white, a yellower one lands squarely on the warm cream this
+// project keeps away from.
+const GROUND = {
+  sky: { id: 'tg-sky', color: '#5b9dd9', alpha: 0.22, atHorizon: 'end' },
+  earth: { id: 'tg-earth', color: '#8a5024', alpha: 0.30, atHorizon: 'start' },
+};
+
+function groundDefs(el) {
+  const defs = el('defs', {});
+  for (const band of Object.values(GROUND)) {
+    const grad = el('linearGradient', { id: band.id, x1: 0, y1: 0, x2: 0, y2: 1 });
+    const solid = { offset: band.atHorizon === 'end' ? '1' : '0', 'stop-opacity': band.alpha };
+    const clear = { offset: band.atHorizon === 'end' ? '0' : '1', 'stop-opacity': 0 };
+    for (const stop of band.atHorizon === 'end' ? [clear, solid] : [solid, clear]) {
+      grad.appendChild(el('stop', { 'stop-color': band.color, ...stop }));
+    }
+    defs.appendChild(grad);
+  }
+  return defs;
+}
+
+// The two bands, sized to whatever is currently in view.
+//
+// Until the first point there is no horizon to sit either side of, so an
+// empty stage stays plain — the ground arrives with the seed that defines it.
+export function groundNodes(tree, grid, el, frame) {
+  const horizon = tree && tree.horizonY != null ? tree.horizonY : null;
+  if (horizon == null) return [];
+
+  const f = frame || { x: 0, y: 0, w: grid.width, h: grid.height };
+  const top = f.y;
+  const bottom = f.y + f.h;
+  const out = [];
+
+  if (horizon > top) {
+    out.push(el('rect', {
+      class: 'tg-sky',
+      x: f.x, y: top, width: f.w, height: horizon - top,
+      fill: `url(#${GROUND.sky.id})`,
+    }));
+  }
+  if (horizon < bottom) {
+    out.push(el('rect', {
+      class: 'tg-earth',
+      x: f.x, y: horizon, width: f.w, height: bottom - horizon,
+      fill: `url(#${GROUND.earth.id})`,
+    }));
+  }
+  return out;
+}
+
 export function createCanvas(host, callbacks = {}) {
   const svg = domEl('svg', {
     class: 'tg-stage',
     xmlns: SVG_NS,
     preserveAspectRatio: 'xMidYMid meet',
   });
+
+  svg.appendChild(groundDefs(domEl));
 
   const layers = {};
   for (const name of LAYER_ORDER) {
@@ -540,6 +605,7 @@ export function createCanvas(host, callbacks = {}) {
       current.grid = grid;
       // Frame the tree, not the world, so the view isn't half empty ground.
       applyFrame(frameFor(tree, grid, opts));
+      fill(layers.ground, groundNodes(tree, grid, domEl, current.frame));
       fill(layers.lattice, latticeNodes(grid, domEl));
       fill(layers.horizon, horizonNodes(tree, grid, domEl, current.frame));
       const branches = branchNodes(tree, grid, domEl, null, opts);
