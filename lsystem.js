@@ -379,6 +379,40 @@ function sproutHeadings(grid, m, byId, id, here, axis, rng) {
   return candidates.map((c) => c.heading);
 }
 
+// Germination: the first year of a seed.
+//
+// A seed is a single point with no edges, so it has no tips, so the tip rule
+// below has nothing to work on and a planted seed would sit there for ever.
+// Its first year is therefore its own rule: put up a shoot and put down a
+// root, both unconditionally. Nothing is rolled for here — `growChance`
+// thins a crown that already exists, and a seed that might not germinate is
+// only a canvas that stays empty.
+//
+// The root point is also what set the horizon, so the downward run is below
+// ground by construction and comes out root-scaled and dashed like any other
+// root, with no special casing.
+function germinate(grid, tree, word, cfg, hooks) {
+  const seed = tree.nodes.find((n) => n.id === tree.rootId);
+  if (!seed) return 0;
+
+  let grown = 0;
+  for (const down of [false, true]) {
+    const { moves } = turtle(word, grid, seed.gi, {
+      ...cfg,
+      heading: down ? 90 : -90,
+      stream: `${cfg.stream || ''}:germinate:${down ? 'root' : 'shoot'}`,
+      upOnly: !down,
+      downOnly: down,
+      step: down ? (cfg.step ?? 2) * (cfg.rootScale ?? 0.75) : cfg.step,
+    });
+    for (const mv of moves) {
+      hooks.edge(mv.from, mv.to);
+      grown += 1;
+    }
+  }
+  return grown;
+}
+
 // Extend an existing tree by one season's worth of growth.
 //
 // Rather than regenerating from the axiom — which would throw away the tree
@@ -388,7 +422,8 @@ function sproutHeadings(grid, m, byId, id, here, axis, rng) {
 // only the ends move outward, which is how a tree actually thickens up.
 //
 // Tips are not the only place growth starts: mature wood can break a new
-// shoot part-way along a limb — that pass runs first, below.
+// shoot part-way along a limb — that pass runs first, below. A tree with no
+// edges at all is a seed, and germinates instead.
 //
 // Growth is seeded, so a given year always grows the same way. `growChance`
 // thins which tips take, so a tree does not double every spring.
@@ -405,7 +440,14 @@ export function extendTips(grid, tree, m, config, hooks) {
 
   const limit = cfg.growLimit ?? 700;
   if (tree.nodes.length >= limit) {
-    return { ok: true, grown: 0, tips: 0, sprouts: 0, capped: true };
+    return { ok: true, grown: 0, tips: 0, sprouts: 0, germinated: false, capped: true };
+  }
+
+  // Nothing joined up yet: this is a seed, and one season's growth on a seed
+  // is germination rather than an extension of anything.
+  if (tree.rootId && !tree.edges.length) {
+    const grown = germinate(grid, tree, word, cfg, hooks);
+    return { ok: true, grown, tips: 0, sprouts: 0, germinated: true, capped: false };
   }
 
   const byId = new Map(tree.nodes.map((n) => [n.id, n]));
@@ -616,5 +658,5 @@ export function extendTips(grid, tree, m, config, hooks) {
     }
   }
 
-  return { ok: true, grown, tips, sprouts, capped: atLimit() };
+  return { ok: true, grown, tips, sprouts, germinated: false, capped: atLimit() };
 }

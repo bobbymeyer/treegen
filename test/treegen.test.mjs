@@ -626,6 +626,76 @@ test('growth stops at the limit and reports bad rules', () => {
   assert.match(inert.error, /no new growth/);
 });
 
+// ---------- germination ----------
+
+// A seed: one point, no edges. This is what a first click leaves behind.
+function plant(type = 'square', seed = 5) {
+  const grid = makeGrid({ type, width: 1200, height: 900, spacing: 30, seed });
+  const tree = makeTree();
+  addNodeAt(tree, grid, grid.nearest(600, 600));
+  return { grid, tree };
+}
+
+function firstYear(grid, tree, config = {}) {
+  return extendTips(grid, tree, metrics(tree),
+    { rules: 'F -> F[+F][-F]F', angle: 35, step: 2, seed: 1, jitter: 35, ...config },
+    { edge: (a, b) => connectAt(tree, grid, a, b) });
+}
+
+for (const type of GRID_TYPES) {
+  test(`${type}: a seed's first year puts up a shoot and puts down roots`, () => {
+    const { grid, tree } = plant(type);
+    const res = firstYear(grid, tree);
+
+    assert.ok(res.ok, res.error);
+    assert.equal(res.germinated, true, 'the seed did not germinate');
+    assert.ok(tree.nodes.length > 1, 'nothing grew from the seed');
+
+    // Both halves, every time — that is the whole point of the rule.
+    let above = 0;
+    let below = 0;
+    for (const n of tree.nodes) {
+      const p = grid.point(n.gi);
+      if (p.y < tree.horizonY) above += 1;
+      else if (p.y > tree.horizonY) below += 1;
+    }
+    assert.ok(above > 0, 'the seed grew no trunk');
+    assert.ok(below > 0, 'the seed grew no root');
+
+    // And it is still a tree: one root, no loops, nothing floating.
+    const m = metrics(tree);
+    assert.equal(tree.edges.length, tree.nodes.length - 1, 'germination closed a loop');
+    assert.equal(m.order.length, tree.nodes.length, 'germination left a node unattached');
+  });
+}
+
+test('germination is unconditional, and happens only once', () => {
+  // Every roll refused and every chance at zero: a seed that might not take
+  // is just a canvas that stays empty, so none of that applies to it.
+  const { grid, tree } = plant();
+  const res = firstYear(grid, tree, {
+    growChance: 0, rootGrowChance: 0, sproutChance: 0,
+    roll: () => 1, sproutRoll: () => 1,
+  });
+  assert.equal(res.germinated, true, 'a refused roll stopped the seed germinating');
+  assert.ok(res.grown > 0);
+
+  // The year after, it is an ordinary tree and grows like one.
+  const next = firstYear(grid, tree, { seed: 2, growChance: 1, rootGrowChance: 1 });
+  assert.equal(next.germinated, false, 'it germinated twice');
+  assert.ok(next.tips > 0, 'the sapling did not grow on from its tips');
+});
+
+test('an empty stage has nothing to germinate', () => {
+  const grid = makeGrid({ type: 'square', width: 1200, height: 900, spacing: 30 });
+  const tree = makeTree();
+  const res = firstYear(grid, tree);
+  assert.ok(res.ok, res.error);
+  assert.equal(res.germinated, false);
+  assert.equal(res.grown, 0);
+  assert.equal(tree.nodes.length, 0);
+});
+
 // ---------- shoots from old wood ----------
 
 // One season on a tree old enough to have mature wood. Every node the rule

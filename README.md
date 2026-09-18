@@ -22,6 +22,7 @@ npm test        # headless, Node >= 22.12
 | Do this | Get this |
 | --- | --- |
 | Click empty space | Place a point. **The first point sets the horizon** — above it is canopy, below is root |
+| Click an empty canvas | Plant a seed. With **grow** on it germinates at once, putting up a shoot and putting down roots; with grow off it is just the first point, and you draw |
 | Hover a point | Reveal it; points stay invisible otherwise |
 | Drag a point | Move it and everything downstream with it; the branch above stretches |
 | Right-click a point | Cut it, and everything past it |
@@ -43,9 +44,9 @@ two of them at whatever angle and length that takes, so nothing staircases.
 | layers | 0–5, default 2 | Rings of lattice cells around each branch that can hold foliage |
 | **season** | | |
 | next season | | Advance one season |
-| grow | off | Extend the tree by one L-system step each spring |
+| grow | **on** | Extend the tree by one L-system step each spring. Also what makes a planted seed germinate |
 | sprout | 0–100, default 25 | Chance per spring that mature wood breaks a bud part-way along a limb |
-| auto | off | Advance on a timer |
+| auto | **on** | Advance on a timer |
 | interval | 1–60s, default 4 | Seconds per season |
 | **file** | | |
 | save json | | The document. This is what round-trips |
