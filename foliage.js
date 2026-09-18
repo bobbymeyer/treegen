@@ -107,6 +107,7 @@ export const FOLIAGE_DEFAULTS = {
 export const PALETTES = {
   orchard: {
     label: 'orchard',
+    wood: { branch: '#3a3028', trunk: '#2b231c', root: '#6b5c4a' },
     leaf: ['#2f5130', '#3d6b38', '#4e8547', '#68a05c', '#86b878'],
     fall: ['#8a4420', '#b06224', '#c9862f', '#ddaa46', '#ecc86a'],
     blossom: ['#d99cb4', '#e7b8c8', '#f2d4de'],
@@ -114,6 +115,7 @@ export const PALETTES = {
   },
   slate: {
     label: 'slate',
+    wood: { branch: '#39424a', trunk: '#272e34', root: '#69737c' },
     leaf: ['#22323d', '#2f4757', '#3f5e71', '#55788b', '#7295a6'],
     fall: ['#4a3a2c', '#6d5334', '#927044', '#b08f5c', '#c9ad7e'],
     blossom: ['#9aa7b5', '#b6c1cc', '#d2dae2'],
@@ -121,6 +123,7 @@ export const PALETTES = {
   },
   ember: {
     label: 'ember',
+    wood: { branch: '#3f3126', trunk: '#2e231a', root: '#77604b' },
     leaf: ['#3a3220', '#55492c', '#726139', '#907c4b', '#ad9a66'],
     fall: ['#6d1f14', '#95321c', '#ba5221', '#d4782b', '#e5a145'],
     blossom: ['#e0a07a', '#eebd9c', '#f7d8c1'],
@@ -128,14 +131,39 @@ export const PALETTES = {
   },
   ink: {
     label: 'ink',
+    wood: { branch: '#1f1f1f', trunk: '#0a0a0a', root: '#5c5c5c' },
     leaf: ['#141414', '#2e2e2e', '#4a4a4a', '#6b6b6b', '#8f8f8f'],
     fall: ['#1f1f1f', '#3d3d3d', '#5c5c5c', '#7e7e7e', '#a3a3a3'],
     blossom: ['#b5b5b5', '#cfcfcf', '#e6e6e6'],
     fruit: ['#0a0a0a', '#262626', '#404040'],
   },
+
+  // Four process inks and nothing between them, which is not what a tree is
+  // made of and is the joke. It still has to obey the same machinery as the
+  // others: tone indexes into each list, so a list of one flat ink would
+  // collapse every object in the crown onto the same value and the canopy
+  // would read as a silhouette. Each ink therefore runs a short ramp of its
+  // own — the same ink, lighter and darker, rather than a drift toward some
+  // neighbouring hue.
+  cmyk: {
+    label: 'cmyk',
+    wood: { branch: '#111111', trunk: '#000000', root: '#4d4d4d' },
+    leaf: ['#00566f', '#00789b', '#009cc6', '#00aeef', '#5cc9f5'],
+    fall: ['#6b5a00', '#a38a00', '#d4b400', '#ffe800', '#fff26b'],
+    blossom: ['#ec008c', '#f45bb0', '#fbaed2'],
+    fruit: ['#8f005a', '#c1007a', '#ec008c'],
+  },
 };
 
 export const PALETTE_NAMES = Object.keys(PALETTES);
+
+// The wood a palette asks for. Branches are not foliage objects, so they take
+// no part in the tone-then-swatch pass the crown goes through — but they are
+// still the palette's to colour, or an ink tree would keep its brown trunk.
+export function woodFor(paletteName) {
+  const palette = PALETTES[paletteName] || PALETTES.orchard;
+  return palette.wood || PALETTES.orchard.wood;
+}
 
 // Which swatch list each kind draws from, per season. This table *is* the
 // autumn mechanism: leaves simply point at a different list in fall and

@@ -15,13 +15,13 @@ import {
   makeTree, addNodeAt, connectAt, moveNode, canMoveTo, metrics, remapToGrid,
   needsRoom, removeBranch, nodeById, findMatureTwigs, twigNodes,
 } from './tree.js';
-import { buildFoliage, PALETTE_NAMES, FOLIAGE_DEFAULTS } from './foliage.js';
+import { buildFoliage, PALETTE_NAMES, FOLIAGE_DEFAULTS, woodFor } from './foliage.js';
 import { createCanvas, edgeKey } from './render.js';
 import { createAnimator } from './animate.js';
 import { generate, extendTips, LSYSTEM_DEFAULTS } from './lsystem.js';
 
 const DRAFT_KEY = 'treegen:draft';
-const DOC_VERSION = 1;
+const DOC_VERSION = 2;
 
 // Auto zoom-out. When the tree reaches within MARGIN_CELLS of an edge the
 // world grows by GROW_BY and the tree re-snaps onto the larger lattice.
@@ -37,6 +37,10 @@ const DOC_VERSION = 1;
 // enough to register as a seed you put there, short enough that it never
 // reads as a click that missed.
 const SPROUT_DELAY = 550;
+
+// Seconds per season when the clock runs itself. A year in four seconds: fast
+// enough that a tree visibly grows while you are looking at it.
+const DEFAULT_INTERVAL = 1;
 
 const MARGIN_CELLS = 2;
 const GROW_BY = 1.3;
@@ -83,12 +87,28 @@ function defaultDoc() {
 
 // Accept anything shaped roughly like a document; fill the rest from
 // defaults so an older or hand-edited file still opens.
+//
+// A stored setting normally wins over the default, which is the whole point
+// of storing it — but only where it was a choice. A draft written before v2
+// carries `grow: false` because that was the default at the time and nobody
+// touched it, and reading that back as a decision left a restored canvas
+// where planting a seed did nothing at all: the click landed, the point went
+// down, and it sat there. So a draft from before the change takes the new
+// default, and keeps everything that really was the reader's — the tree, the
+// grid, the seed, the palette, the rules.
+function migrate(doc, from) {
+  if (from < 2) doc.grow = defaultDoc().grow;
+  return doc;
+}
+
 function normalizeDoc(raw) {
   const base = defaultDoc();
   if (!raw || typeof raw !== 'object') return base;
-  return {
+  const from = Number(raw.version) || 0;
+  return migrate({
     ...base,
     ...raw,
+    version: DOC_VERSION,
     grid: { ...base.grid, ...(raw.grid || {}) },
     tree: raw.tree && Array.isArray(raw.tree.nodes) ? raw.tree : base.tree,
     lsystem: { ...base.lsystem, ...(raw.lsystem || {}) },
@@ -97,7 +117,7 @@ function normalizeDoc(raw) {
       ...(raw.rules || {}),
       placement: { ...base.rules.placement, ...((raw.rules || {}).placement || {}) },
     },
-  };
+  }, from);
 }
 
 // ---------- App ----------
@@ -341,6 +361,7 @@ function boot(root) {
     }
 
     objects = buildObjects();
+    applyWood();
     canvas.setFoliage(objects, grid);
     animator.setScene({
       objects,
@@ -353,6 +374,18 @@ function boot(root) {
     });
     syncReadouts();
     saveDraft();
+  }
+
+  // Branches are drawn by CSS rather than per-object like foliage, so the
+  // palette's wood is handed over as custom properties on the stage and the
+  // branch rules read it from there. One assignment, whatever the tree.
+  function applyWood() {
+    const wood = woodFor(doc.palette);
+    const el = canvas.svg;
+    if (!el) return;
+    el.style.setProperty('--tg-wood-branch', wood.branch);
+    el.style.setProperty('--tg-wood-trunk', wood.trunk);
+    el.style.setProperty('--tg-wood-root', wood.root);
   }
 
   function syncReadouts() {
@@ -421,11 +454,15 @@ function boot(root) {
     clone.setAttribute('height', Math.round(frame.h));
     clone.removeAttribute('class');
 
+    // The clone leaves its stylesheet behind, so the branch rules are written
+    // into it — in the palette's own wood, or an ink tree would export with
+    // the default's brown branches under its black canopy.
+    const wood = woodFor(doc.palette);
     const style = document.createElementNS('http://www.w3.org/2000/svg', 'style');
     style.textContent =
-      '.tg-branch{stroke:#3a3028;stroke-linecap:round;fill:none}' +
-      '.tg-branch-trunk{stroke:#2b231c;stroke-linecap:butt}' +
-      '.tg-branch-root{stroke:#6b5c4a;stroke-dasharray:3 3}';
+      `.tg-branch{stroke:${wood.branch};stroke-linecap:round;fill:none}` +
+      `.tg-branch-trunk{stroke:${wood.trunk};stroke-linecap:butt}` +
+      `.tg-branch-root{stroke:${wood.root};stroke-dasharray:3 3}`;
     clone.insertBefore(style, clone.firstChild);
 
     const text = new XMLSerializer().serializeToString(clone);
@@ -472,6 +509,7 @@ function boot(root) {
         // Palette substitution is stage two only — tone is untouched, so
         // this never disturbs the design underneath.
         animator.repaint(doc.palette);
+        applyWood();
         saveDraft();
       });
     }
@@ -553,7 +591,7 @@ function boot(root) {
     const auto = $('#tg-auto');
     const interval = $('#tg-interval');
     const applyAuto = () => {
-      const secs = Math.max(1, Number(interval?.value) || 4);
+      const secs = Math.max(1, Number(interval?.value) || DEFAULT_INTERVAL);
       animator.setAutoplay(!!auto?.checked, secs);
     };
     auto?.addEventListener('change', applyAuto);

@@ -44,14 +44,14 @@ empty canvas has no ground to show.
 | clear | | Empty the canvas |
 | **look** | | |
 | roll seed | | New seed. Changes the canopy without touching the tree you drew |
-| palette | orchard, slate, ember, ink | Swatch list for leaf, fall, blossom and fruit |
+| palette | orchard, slate, ember, ink, cmyk | Swatch list for leaf, fall, blossom, fruit and wood. **cmyk** is the four process inks and nothing between them: black trees, cyan spring, yellow fall, magenta fruit |
 | layers | 0–5, default 2 | Rings of lattice cells around each branch that can hold foliage |
 | **season** | | |
 | next season | | Advance one season |
 | grow | **on** | Extend the tree by one L-system step each spring. Also what makes a planted seed germinate |
 | sprout | 0–100, default 25 | Chance per spring that mature wood breaks a bud part-way along a limb |
 | auto | **on** | Advance on a timer |
-| interval | 1–60s, default 4 | Seconds per season |
+| interval | 1–60s, default 1 | Seconds per season |
 | **file** | | |
 | save json | | The document. This is what round-trips |
 | load | | Read a saved document |
