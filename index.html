@@ -22,58 +22,9 @@
 </style>
 </head>
 <body>
-<div id='treegen'>
-  <div id='tg-head'>
-    <h1>treegen<sup class='tg-version'>v0.01a</sup></h1>
-    <p class='tg-sub'>a tool for growing trees on a grid</p>
-  </div>
-  <div class='tg-bar'>
-    <div class='tg-group'>
-      <span class='tg-label'>structure</span>
-      <select id='tg-grid' title='lattice'></select>
-      <label class='tg-check' title='Strahler order at which the stem stops being trunk — higher ends the trunk lower'>trunk<input type='number' id='tg-trunk' min='1' max='6' step='1' value='2'></label>
-      <button id='tg-clear' class='tg-btn'>clear</button>
-    </div>
-    <div class='tg-group'>
-      <span class='tg-label'>look</span>
-      <button id='tg-roll' class='tg-btn'>roll seed</button>
-      <code id='tg-seed' class='tg-readout'>1</code>
-      <select id='tg-palette' title='palette'></select>
-      <label class='tg-check' title='rings of leaf cells around each branch'>layers<input type='number' id='tg-layers' min='0' max='5' step='1' value='2'></label>
-    </div>
-    <div class='tg-group'>
-      <span class='tg-label'>season</span>
-      <button id='tg-next' class='tg-btn'>next season</button>
-      <label class='tg-check' title='extend the tree by one l-system step each spring'><input type='checkbox' id='tg-grow' checked> grow</label>
-      <label class='tg-check' title='chance each spring that mature wood breaks a new shoot part-way along a limb'>shoots<input type='number' id='tg-sprout' min='0' max='100' step='5' value='25'><span class='tg-unit'>%</span></label>
-      <code class='tg-readout'><span id='tg-season'>spring</span> · yr <span id='tg-year'>1</span></code>
-      <label class='tg-check'><input type='checkbox' id='tg-auto' checked> auto</label>
-      <input type='number' id='tg-interval' min='1' max='60' step='1' value='1' title='seconds per season'>
-      <span class='tg-unit'>s</span>
-    </div>
-    <div class='tg-group'>
-      <span class='tg-label'>file</span>
-      <button id='tg-save' class='tg-btn'>save json</button>
-      <label class='tg-btn tg-file'>load<input type='file' id='tg-load' accept='application/json'></label>
-      <button id='tg-export' class='tg-btn'>export svg</button>
-    </div>
-  </div>
-  <details id='tg-lsys'>
-    <summary>l-system</summary>
-    <div class='tg-lsys-body'>
-      <label class='tg-field'><span>axiom</span><input type='text' id='tg-ls-axiom' value='F'></label>
-      <label class='tg-field tg-field-wide'><span>rules</span><textarea id='tg-ls-rules' rows='3' spellcheck='false'>F -> F[+F][-F]F</textarea></label>
-      <label class='tg-field'><span>iterations</span><input type='number' id='tg-ls-iters' min='0' max='8' value='5'></label>
-      <label class='tg-field'><span>angle</span><input type='number' id='tg-ls-angle' min='5' max='120' value='35'></label>
-      <label class='tg-field' title='branch length, in grid steps'><span>segment</span><input type='number' id='tg-ls-step' min='1' max='8' step='1' value='2'></label>
-      <label class='tg-field' title='how far branches may depart from the exact rule, 0-100'><span>variation</span><input type='number' id='tg-ls-jitter' min='0' max='100' step='5' value='35'></label>
-      <label class='tg-field' title='depth of the root system below the horizon; 0 for none'><span>roots</span><input type='number' id='tg-ls-roots' min='0' max='6' step='1' value='3'></label>
-      <button id='tg-ls-run' class='tg-btn'>generate</button>
-    </div>
-  </details>
-  <div id='tg-canvas'></div>
-  <p id='tg-status' class='tg-status'></p>
-</div>
+<!-- treegen brings its own chrome; this is only where it goes. -->
+<div id='treegen'></div>
+
 <script type="module" src="./treegen.js"></script>
 </body>
 </html>
