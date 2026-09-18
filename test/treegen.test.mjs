@@ -32,6 +32,8 @@ import {
 import {
   lerpHex, planTransition, planBranchFall, frameState, settledState, TIMING, WINTER,
 } from '../animate.js';
+import { defaultDoc, normalizeDoc } from '../treegen.js';
+import { PALETTES, woodFor } from '../foliage.js';
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 
@@ -625,6 +627,80 @@ test('growth stops at the limit and reports bad rules', () => {
   const inert = extendTips(grid, tree, metrics(tree), { rules: 'F -> F' }, { edge: () => {} });
   assert.equal(inert.ok, false);
   assert.match(inert.error, /no new growth/);
+});
+
+// ---------- drafts ----------
+
+// The saved draft is the reader's, and a stored setting beats a default —
+// that is what storing it is for. But only where it was a choice: a draft
+// written before `grow` defaulted on carries `grow: false` because that was
+// the default then, and reading it back as a decision left a restored canvas
+// where planting a seed did nothing at all.
+test('a draft from before grow was the default takes the new default', () => {
+  const old = {
+    version: 1,
+    grow: false,
+    seed: 9,
+    palette: 'slate',
+    tree: { nodes: [{ id: 'n0', gi: 5 }], edges: [], rootId: 'n0', horizonY: 10, nextId: 1 },
+    rules: { placement: { layers: 4, trunkMinOrder: 3, matureOrder: 5 } },
+  };
+  const doc = normalizeDoc(old);
+
+  assert.equal(doc.grow, defaultDoc().grow, 'an old draft kept the old default');
+  assert.equal(doc.grow, true);
+
+  // Everything that really was the reader's survives.
+  assert.equal(doc.seed, 9);
+  assert.equal(doc.palette, 'slate');
+  assert.equal(doc.tree.rootId, 'n0');
+  assert.equal(doc.rules.placement.layers, 4);
+  assert.equal(doc.rules.placement.matureOrder, 5);
+  assert.equal(doc.version, 2, 'the draft was not stamped with the new version');
+});
+
+test('a draft written since the change keeps grow off when that was chosen', () => {
+  const doc = normalizeDoc({ version: 2, grow: false, seed: 3 });
+  assert.equal(doc.grow, false, 'a real choice was overwritten by the default');
+  assert.equal(doc.seed, 3);
+});
+
+// ---------- palettes ----------
+
+test('every palette carries wood, and cmyk is four inks and nothing else', () => {
+  for (const [name, palette] of Object.entries(PALETTES)) {
+    const wood = woodFor(name);
+    for (const part of ['branch', 'trunk', 'root']) {
+      assert.match(wood[part], /^#[0-9a-f]{6}$/i, `${name} has no ${part} wood`);
+    }
+    // Tone indexes into each list, so a list of one flat colour would collapse
+    // every object in the crown onto the same value.
+    for (const kind of ['leaf', 'fall', 'blossom', 'fruit']) {
+      assert.ok(palette[kind].length > 1, `${name}.${kind} has nothing to vary across`);
+      assert.equal(new Set(palette[kind]).size, palette[kind].length,
+        `${name}.${kind} repeats a colour`);
+    }
+  }
+
+  // K trees, C spring leaves, Y fall leaves, M fruit.
+  const cmyk = PALETTES.cmyk;
+  const channel = (hex) => {
+    const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16));
+    return { r, g, b };
+  };
+  assert.equal(woodFor('cmyk').trunk, '#000000');
+  for (const leaf of cmyk.leaf) {
+    const { r, g, b } = channel(leaf);
+    assert.ok(b > r && g > r, `${leaf} is not a cyan`);
+  }
+  for (const fall of cmyk.fall) {
+    const { r, g, b } = channel(fall);
+    assert.ok(r > b && g > b, `${fall} is not a yellow`);
+  }
+  for (const fruit of cmyk.fruit) {
+    const { r, g, b } = channel(fruit);
+    assert.ok(r > g && b > g, `${fruit} is not a magenta`);
+  }
 });
 
 // ---------- sky and earth ----------

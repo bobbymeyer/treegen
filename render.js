@@ -273,8 +273,13 @@ export function serialize(node) {
 
 // Build a complete standalone SVG document from engine state, without a DOM.
 // Used by the test suite to emit a proof file.
+// Wood as it stands unless a palette says otherwise, so a caller that knows
+// nothing about palettes still gets the tree it always got.
+export const DEFAULT_WOOD = { branch: '#3a3028', trunk: '#2b231c', root: '#6b5c4a' };
+
 export function renderToString(tree, grid, objects, opts = {}) {
   const el = objectEl;
+  const wood = { ...DEFAULT_WOOD, ...(opts.wood || {}) };
 
   // `fit` crops the view to the drawing plus a margin, so a tree that
   // overruns its world is still fully visible. Without it the view is the
@@ -315,9 +320,9 @@ export function renderToString(tree, grid, objects, opts = {}) {
     children: [],
     raw:
       '.tg-site{fill:rgba(0,0,0,.16)}' +
-      '.tg-branch{stroke:#3a3028;stroke-linecap:round;fill:none}' +
-      '.tg-branch-trunk{stroke:#2b231c;stroke-linecap:butt}' +
-      '.tg-branch-root{stroke:#6b5c4a;stroke-dasharray:3 3}' +
+      `.tg-branch{stroke:${wood.branch};stroke-linecap:round;fill:none}` +
+      `.tg-branch-trunk{stroke:${wood.trunk};stroke-linecap:butt}` +
+      `.tg-branch-root{stroke:${wood.root};stroke-dasharray:3 3}` +
       '.tg-horizon-line{stroke:rgba(0,0,0,.55);stroke-dasharray:5 4}',
   });
   root.appendChild(style);
@@ -357,14 +362,16 @@ export function renderToString(tree, grid, objects, opts = {}) {
 // The prompt shown on a stage with nothing on it. Sized against the view
 // rather than the screen so it holds its proportions as the world grows, and
 // set where a seedling would stand — left of centre, above the middle — so it
-// reads as a caption on the field rather than a dialog over it.
+// reads as a caption on the field rather than a dialog over it. Kept to
+// caption size: it is an instruction, not a headline, and the stage around it
+// is already saying the same thing by being empty.
 function emptyHint(grid, frame) {
   const f = frame || { x: 0, y: 0, w: grid.width, h: grid.height };
   const node = domEl('text', {
     class: 'tg-hint',
     x: (f.x + f.w * 0.08).toFixed(1),
     y: (f.y + f.h * 0.46).toFixed(1),
-    'font-size': Math.max(11, f.w * 0.03).toFixed(1),
+    'font-size': Math.max(11, f.w * 0.016).toFixed(1),
   });
   node.textContent = 'click to plant a seed';
   return node;

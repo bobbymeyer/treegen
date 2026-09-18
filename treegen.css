@@ -1,102 +1,195 @@
 /* treegen — tool chrome.
  *
- * Neutral greys, black hairlines and hard offset shadows, matching the site's
- * existing surfaces. Everything is left-aligned. Colour belongs to the tree,
- * not to the UI.
+ * Swiss, in the sense the its-swiss gem's DESIGN.md means it, and applied
+ * here rather than depended on: treegen has no build and no packages, so the
+ * arguments are borrowed and the tokens are its own.
+ *
+ * What that costs the old chrome: the hard offset shadows, the corner radii,
+ * the dashed borders and the grey slabs all go. None of them were carrying
+ * information — they were there to make a panel look like a panel.
+ *
+ * What replaces them:
+ *
+ *   A value ladder, paper to ink, in OKLCH so the steps read as a scale.
+ *   Spaced unevenly on purpose — dense at the light end, because a hairline
+ *   has to be barely there, and sparse through the middle, which only has to
+ *   hold secondary text away from primary. Nothing here invents a colour off
+ *   the ladder except the accent.
+ *
+ *   A baseline. `--tg-line` is the interval every vertical measure registers
+ *   to: every margin, padding and gap down the page is one line or a whole
+ *   multiple. `--tg-space-*` is the horizontal step, which has no baseline to
+ *   miss.
+ *
+ *   Rules drawn inside the box, as inset shadows, never added to it. A pixel
+ *   added instead of taken is a box a pixel taller than the ladder says, and
+ *   every rule on the page doing it walks the error down the column.
+ *
+ *   Controls that are a rule under the text rather than a box around it. This
+ *   is most of why the toolbar stops looking like a dialog: a row of boxed
+ *   fields reads as chrome, a row of ruled ones reads as type.
+ *
+ *   One accent, for state and for the thing that cannot be undone. Collapse
+ *   it onto the ladder and the UI still reads, which is the test of whether
+ *   the values were doing the work.
+ *
+ * Colour still belongs to the tree. The stage keeps the palette it had.
  */
 
 #treegen {
-  --tg-ink: #000;
-  --tg-panel: #ccc;
+  /* Paper to ink. */
+  --tg-paper: oklch(100% 0 0);
+  --tg-paper-2: oklch(97.5% 0 0);
+  --tg-hair: oklch(86% 0 0);
+  --tg-faint: oklch(72% 0 0);
+  --tg-quiet: oklch(45% 0 0);   /* clears 4.5:1 on paper */
+  --tg-ink: oklch(17% 0 0);
+
+  /* State, and the one thing that cannot be undone. Nothing else. */
+  --tg-accent: oklch(52% 0.192 27);
+
+  /* The baseline, and the horizontal step. */
+  --tg-line: 1.25rem;
+  --tg-space-1: 0.5rem;
+  --tg-space-2: 1rem;
+  --tg-space-3: 1.5rem;
+
+  --tg-size-0: 0.75rem;
+  --tg-size-1: 0.8125rem;
+
+  /* The stage is the drawing's, not the chrome's. */
   --tg-stage: #fff;
-  --tg-hair: #000;
-  --tg-muted: rgba(0, 0, 0, 0.55);
-  --tg-shadow: 0.35rem 0.35rem 0 0 rgba(0, 0, 0, 1);
 
   max-width: 1180px;
-  margin: 0 auto calc(var(--spacing-unit) * 2);
-  padding: 0 var(--spacing-unit);
+  margin: 0 auto calc(var(--tg-line) * 2);
+  padding: 0 var(--tg-space-2);
+  color: var(--tg-ink);
   text-align: left;
 }
 
 /* ---------- Header ---------- */
 
 #tg-head {
-  margin-bottom: var(--spacing-unit);
+  padding-bottom: var(--tg-line);
+  margin-bottom: var(--tg-line);
+  /* The rule comes out of the padding above it, not added under it. */
+  box-shadow: inset 0 -1px 0 0 var(--tg-ink);
 }
 
 #tg-head h1 {
-  font-size: var(--font-size-h2);
-  line-height: 1;
+  font-size: calc(var(--tg-line) * 1.4);
+  line-height: calc(var(--tg-line) * 2);
+  font-weight: 700;
+  letter-spacing: -0.02em;
 }
 
+/* Sits on the title's line rather than asking it for room. */
 .tg-version {
-  font-size: var(--font-size-h6);
-  font-weight: 200;
-  letter-spacing: 0.02em;
-  margin-left: 0.25rem;
+  font-size: var(--tg-size-0);
+  font-weight: 400;
+  line-height: 0;
+  letter-spacing: 0;
+  margin-left: 0.4em;
   vertical-align: super;
+  color: var(--tg-quiet);
 }
 
 .tg-sub {
-  color: var(--tg-muted);
-  margin-top: 0.25rem;
+  font-size: var(--tg-size-1);
+  line-height: var(--tg-line);
+  color: var(--tg-quiet);
 }
 
 /* ---------- Toolbar ---------- */
 
+/* No fill and no frame: two rules, and the groups between them. A panel that
+   is a slab of grey announces itself; a panel that is a band of type does
+   not have to. */
 .tg-bar {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
-  gap: 0.45rem 0.8rem;
-  padding: 0.6rem 0.7rem;
-  background: var(--tg-panel);
-  border: 1px solid var(--tg-hair);
-  border-radius: 0.25rem;
-  box-shadow: var(--tg-shadow);
+  align-items: baseline;
+  gap: var(--tg-line) var(--tg-space-3);
+  padding-bottom: var(--tg-line);
+  box-shadow: inset 0 -1px 0 0 var(--tg-hair);
 }
 
+/* Label on the line of air above the controls — the dense form, for a panel
+   of many fields. */
 .tg-group {
   display: flex;
-  align-items: center;
-  gap: 0.35rem;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--tg-space-2);
 }
 
-/* Dashed rule separating each group, rather than a heavier divider. */
+/* A hairline between groups, drawn inside the gap rather than added to it. */
 .tg-group + .tg-group {
-  padding-left: 0.8rem;
-  border-left: 1px dashed rgba(0, 0, 0, 0.45);
+  padding-left: var(--tg-space-3);
+  box-shadow: inset 1px 0 0 0 var(--tg-hair);
 }
 
 .tg-label {
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: lowercase;
-  color: var(--tg-muted);
+  font-size: var(--tg-size-0);
+  line-height: var(--tg-line);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--tg-quiet);
 }
 
+/* Every button is the same box: two lines tall, a keyline drawn inside it as
+   an inset shadow, so the box is the label's line and two paddings and
+   nothing else. No radius — a rounded button is a button apologising. */
 .tg-btn {
+  box-sizing: border-box;
   font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 600;
-  line-height: 1;
-  padding: 0.4rem 0.5rem;
+  font-size: var(--tg-size-1);
+  line-height: var(--tg-line);
+  padding: calc(var(--tg-line) / 2) var(--tg-space-2);
   color: var(--tg-ink);
-  background: var(--tg-stage);
-  border: 1px solid var(--tg-hair);
-  border-radius: 0.15rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset 0 0 0 1px var(--tg-ink);
   cursor: pointer;
 }
 
 .tg-btn:hover {
   background: var(--tg-ink);
-  color: var(--tg-stage);
+  color: var(--tg-paper);
 }
 
-.tg-btn:active {
-  transform: translate(1px, 1px);
+.tg-btn:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 0 0 2px var(--tg-ink);
+}
+
+/* The one filled button is in ink, not in the accent: the primary action is
+   the one you were going to take anyway. */
+#tg-ls-run {
+  background: var(--tg-ink);
+  color: var(--tg-paper);
+}
+
+#tg-ls-run:hover {
+  background: var(--tg-paper);
+  color: var(--tg-ink);
+}
+
+/* Clearing is the one thing that cannot be undone, so it is set apart by a
+   step on the ladder before it is ever coloured — a reader scanning the row
+   has not hovered anything yet — and then by the accent on hover and on
+   focus, because a keyboard reaches it and touch never hovers. */
+#tg-clear {
+  color: var(--tg-quiet);
+  box-shadow: inset 0 0 0 1px var(--tg-faint);
+}
+
+#tg-clear:hover,
+#tg-clear:focus-visible {
+  color: var(--tg-paper);
+  background: var(--tg-accent);
+  box-shadow: inset 0 0 0 1px var(--tg-accent);
 }
 
 /* The file input is hidden behind its own label, styled as a button. */
@@ -109,117 +202,182 @@
   display: none;
 }
 
+/* A control is a rule under the text, not a box around it: two lines, a line
+   of air and then the line the type stands on, the way a line of handwriting
+   stands on a ruled page. The rule's width comes out of the padding, so the
+   control is still exactly two lines tall. */
 #treegen select,
 #treegen input[type='text'],
 #treegen input[type='number'],
 #treegen textarea {
+  box-sizing: border-box;
   font-family: inherit;
-  font-size: 0.8rem;
-  padding: 0.35rem 0.4rem;
+  font-size: var(--tg-size-1);
+  line-height: var(--tg-line);
+  padding: var(--tg-line) 0 0;
   color: var(--tg-ink);
-  background: var(--tg-stage);
-  border: 1px solid var(--tg-hair);
-  border-radius: 0.15rem;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: inset 0 -1px 0 0 var(--tg-ink);
+}
+
+/* The focus is the rule and not a box: a box drawn round a control whose only
+   visible part is a rule crosses whatever sits above it. */
+#treegen select:focus-visible,
+#treegen input[type='text']:focus-visible,
+#treegen input[type='number']:focus-visible,
+#treegen textarea:focus-visible {
+  outline: 0;
+  box-shadow: inset 0 -2px 0 0 var(--tg-accent);
+}
+
+/* A select keeps a caret, because without one it is a word that happens to
+   be clickable. Drawn, not a glyph, so it sits where the rule wants it. */
+#treegen select {
+  appearance: none;
+  min-width: 7rem;
+  padding-right: var(--tg-space-2);
+  background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
+                    linear-gradient(135deg, currentColor 50%, transparent 50%);
+  background-size: 4px 4px, 4px 4px;
+  background-position: right 4px center, right 0 center;
+  background-repeat: no-repeat;
+}
+
+#treegen textarea {
+  padding: 0;
 }
 
 #tg-interval,
 #tg-layers,
-#tg-trunk {
-  width: 2.9rem;
+#tg-trunk,
+#tg-sprout {
+  width: 2.5rem;
 }
 
 .tg-unit {
-  font-size: 0.75rem;
-  color: var(--tg-muted);
-  margin-left: -0.2rem;
+  font-size: var(--tg-size-0);
+  line-height: var(--tg-line);
+  color: var(--tg-quiet);
 }
 
+/* A checkbox keeps its label beside it — it is the one control whose box is
+   the point. */
 .tg-check {
   display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  font-size: 0.8rem;
+  align-items: baseline;
+  gap: var(--tg-space-1);
+  font-size: var(--tg-size-1);
+  line-height: var(--tg-line);
   cursor: pointer;
 }
 
+.tg-check input[type='checkbox'] {
+  accent-color: var(--tg-ink);
+  margin: 0;
+}
+
+/* A readout is read, not operated: quiet ink and nothing round it. */
 .tg-readout {
-  font-size: 0.75rem;
-  padding: 0.3rem 0.4rem;
-  color: var(--tg-muted);
-  background: var(--tg-stage);
-  border: 1px dashed rgba(0, 0, 0, 0.45);
-  border-radius: 0.15rem;
+  font-size: var(--tg-size-1);
+  line-height: var(--tg-line);
+  color: var(--tg-quiet);
   white-space: nowrap;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ---------- L-system disclosure ---------- */
 
 #tg-lsys {
-  margin-top: 0.6rem;
-  border: 1px dashed rgba(0, 0, 0, 0.45);
-  border-radius: 0.25rem;
-  background: var(--tg-panel);
+  padding-bottom: var(--tg-line);
+  box-shadow: inset 0 -1px 0 0 var(--tg-hair);
 }
 
 #tg-lsys > summary {
-  padding: 0.45rem 0.75rem;
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.08em;
+  font-size: var(--tg-size-0);
+  line-height: calc(var(--tg-line) * 2);
+  color: var(--tg-quiet);
   cursor: pointer;
   list-style: none;
 }
 
+#tg-lsys > summary::-webkit-details-marker {
+  display: none;
+}
+
 #tg-lsys > summary::before {
-  content: '+ ';
-  font-weight: 800;
+  content: '+';
+  display: inline-block;
+  width: var(--tg-space-2);
+  color: var(--tg-ink);
 }
 
 #tg-lsys[open] > summary::before {
-  content: '− ';
+  content: '\2212';
 }
 
+/* Aligned to the top, so every label in the row sits on one line. Bottom
+   alignment would hang them at whatever height their control happens to be,
+   and the row would stop reading as a row. */
 .tg-lsys-body {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: 0.75rem;
-  padding: 0 0.75rem 0.75rem;
+  align-items: flex-start;
+  gap: var(--tg-line) var(--tg-space-3);
+  padding-bottom: var(--tg-line);
 }
 
+/* Label on the line of air, control on the line its rule closes. */
 .tg-field {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.7rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: var(--tg-muted);
+  font-size: var(--tg-size-0);
+  line-height: var(--tg-line);
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--tg-quiet);
+}
+
+/* In the dense form the label has already taken the line of air, so the
+   control is just the one line its rule closes. Qualified by the id because
+   the base rule is, and a class alone loses to it however much more specific
+   it reads — which left each label and its own control a line apart. */
+#treegen .tg-field select,
+#treegen .tg-field input[type='text'],
+#treegen .tg-field input[type='number'],
+#treegen .tg-field textarea {
+  padding: 0;
+}
+
+.tg-lsys-body > .tg-btn {
+  margin-top: var(--tg-line);
 }
 
 .tg-field-wide {
-  flex: 1 1 18rem;
+  flex: 1 1 20rem;
 }
 
 .tg-field textarea {
   width: 100%;
   resize: vertical;
   font-family: ui-monospace, Menlo, Consolas, monospace;
-  font-size: 0.75rem;
+  font-size: var(--tg-size-0);
+  color: var(--tg-ink);
 }
 
 .tg-field input[type='number'] {
-  width: 5rem;
+  width: 4rem;
 }
 
 /* ---------- Stage ---------- */
 
 #tg-canvas {
-  margin-top: 0.75rem;
+  margin-top: var(--tg-line);
   background: var(--tg-stage);
-  border: 1px solid var(--tg-hair);
-  border-radius: 0.25rem;
-  box-shadow: var(--tg-shadow);
+  /* The keyline is drawn inside the stage, so the stage is exactly as tall as
+     the drawing asks for and the column below it stays on the baseline. */
+  box-shadow: inset 0 0 0 1px var(--tg-hair);
   overflow: hidden;
 }
 
@@ -243,7 +401,7 @@
 }
 
 .tg-branch {
-  stroke: #3a3028;
+  stroke: var(--tg-wood-branch, #3a3028);
   stroke-linecap: round;
   fill: none;
 }
@@ -251,14 +409,14 @@
 /* The trunk — the most central path — carries no vegetation, so it reads as
    bare wood. Slightly darker and blunt-ended to look structural. */
 .tg-branch-trunk {
-  stroke: #2b231c;
+  stroke: var(--tg-wood-trunk, #2b231c);
   stroke-linecap: butt;
 }
 
 /* Roots read lighter and dashed, so the structure below the horizon is
    legible without competing with the canopy. */
 .tg-branch-root {
-  stroke: #6b5c4a;
+  stroke: var(--tg-wood-root, #6b5c4a);
   stroke-dasharray: 3 3;
 }
 
@@ -266,8 +424,8 @@
    you put the cursor on one. They keep their hit area either way, so the tree
    is grabbable everywhere without being peppered with dots. */
 .tg-handle {
-  fill: #fff;
-  stroke: #000;
+  fill: var(--tg-paper);
+  stroke: var(--tg-ink);
   stroke-width: 1;
   cursor: grab;
   opacity: 0;
@@ -281,8 +439,8 @@
 
 /* The root is the horizon marker, so it stays visible. */
 .tg-handle-root {
-  fill: #000;
-  stroke: #000;
+  fill: var(--tg-ink);
+  stroke: var(--tg-ink);
   opacity: 1;
 }
 
@@ -298,7 +456,7 @@
 /* The empty-stage prompt. Left-aligned like every other piece of text here,
    and in the same grey as the lattice so it reads as chrome, not drawing. */
 .tg-hint {
-  fill: #9a9a9a;
+  fill: var(--tg-faint);
   text-anchor: start;
   font-family: inherit;
   letter-spacing: 0.01em;
@@ -312,49 +470,48 @@
 
 /* Legal drag destinations. `is-hot` is the one that will be committed. */
 .tg-target {
-  fill: rgba(0, 0, 0, 0.08);
-  stroke: rgba(0, 0, 0, 0.5);
+  fill: none;
+  stroke: var(--tg-faint);
   stroke-width: 1;
-  stroke-dasharray: 2 2;
   pointer-events: none;
 }
 
+/* The point the drop will actually take. */
 .tg-target.is-hot {
-  fill: rgba(0, 0, 0, 0.35);
-  stroke: #000;
-  stroke-dasharray: none;
+  fill: var(--tg-ink);
+  stroke: var(--tg-ink);
 }
 
-/* The only illegal drop is a point another node already holds. */
+/* The only illegal drop is a point another node already holds — a refusal,
+   which is the accent's other job. */
 .tg-target.is-blocked {
   fill: none;
-  stroke: #8a1c14;
-  stroke-dasharray: 2 2;
+  stroke: var(--tg-accent);
 }
 
 /* ---------- Status ---------- */
 
 .tg-status {
-  min-height: 1.2rem;
-  margin-top: 0.5rem;
-  font-size: 0.78rem;
-  color: var(--tg-muted);
+  min-height: var(--tg-line);
+  margin-top: var(--tg-line);
+  font-size: var(--tg-size-1);
+  line-height: var(--tg-line);
+  color: var(--tg-quiet);
 }
 
+/* A refusal is the accent, not bold quiet ink: weight says "important", the
+   accent says "this did not happen". */
 .tg-status.is-error {
-  color: #8a1c14;
-  font-weight: 600;
+  color: var(--tg-accent);
 }
 
 /* ---------- Narrow screens ---------- */
 
 @media (max-width: 720px) {
+  /* Stacked, the groups are divided by the stack; the rule between them would
+     be a rule across the top of each. */
   .tg-group + .tg-group {
     padding-left: 0;
-    border-left: 0;
-  }
-
-  .tg-bar {
-    gap: 0.5rem 0.75rem;
+    box-shadow: none;
   }
 }
